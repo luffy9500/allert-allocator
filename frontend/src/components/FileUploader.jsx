@@ -1,36 +1,14 @@
 /**
- * Componente generico per l'upload di un file Excel.
- * Mostra lo stato (non caricato / caricato / errore).
+ * Componente upload file Excel con bottone info (?).
  */
 
 import React, { useRef, useState } from 'react'
 import useStore from '../store.js'
+import InfoTooltip from './InfoTooltip.jsx'
 
-const styles = {
-  wrap: { marginBottom: '0.75rem' },
-  label: { display: 'block', fontWeight: 600, marginBottom: '0.3rem', fontSize: '0.88rem' },
-  row: { display: 'flex', alignItems: 'center', gap: '0.75rem' },
-  btn: {
-    padding: '0.35rem 0.9rem', background: '#1a3c6e', color: '#fff',
-    border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem',
-  },
-  badge: (ok) => ({
-    fontSize: '0.8rem', padding: '0.2rem 0.6rem', borderRadius: 10,
-    background: ok ? '#d4edda' : '#f8d7da',
-    color: ok ? '#155724' : '#721c24',
-  }),
-  hint: { fontSize: '0.78rem', color: '#6c757d', marginTop: '0.2rem' },
-}
-
-/**
- * @param {object} props
- * @param {string} props.tipo     - es. "cedi_scadenze"
- * @param {string} props.label    - es. "CEDI_SCADENZE"
- * @param {string} props.hint     - descrizione colonne attese
- */
-export default function FileUploader({ tipo, label, hint }) {
-  const { sessionId, apiHeaders, markFileCaricato, filesCaricati } = useStore()
-  const [stato, setStato] = useState(null)   // null | "ok" | "errore"
+export default function FileUploader({ tipo, label, obbligatorio = false, infoTitle, infoContent }) {
+  const { apiHeaders, markFileCaricato, filesCaricati } = useStore()
+  const [stato, setStato] = useState(null)   // null | "ok" | "errore" | "loading"
   const [msg, setMsg] = useState('')
   const inputRef = useRef()
 
@@ -43,8 +21,8 @@ export default function FileUploader({ tipo, label, hint }) {
     const formData = new FormData()
     formData.append('file', file)
 
-    setStato(null)
-    setMsg('Caricamento...')
+    setStato('loading')
+    setMsg('')
 
     try {
       const res = await fetch(`/api/upload/${tipo}`, {
@@ -58,7 +36,7 @@ export default function FileUploader({ tipo, label, hint }) {
         setMsg(data.detail || 'Errore sconosciuto')
       } else {
         setStato('ok')
-        setMsg(data.messaggio)
+        setMsg(`${data.righe} righe caricate`)
         markFileCaricato(tipo)
       }
     } catch (err) {
@@ -66,22 +44,62 @@ export default function FileUploader({ tipo, label, hint }) {
       setMsg('Errore di rete: ' + err.message)
     }
 
-    // Reset input per permettere ri-upload dello stesso file
     inputRef.current.value = ''
   }
 
+  const isOk = caricato || stato === 'ok'
+
   return (
-    <div style={styles.wrap}>
-      <label style={styles.label}>{label}</label>
-      <div style={styles.row}>
-        <button style={styles.btn} onClick={() => inputRef.current.click()}>
-          Scegli file
+    <div style={{ marginBottom: '0.9rem' }}>
+      {/* Label row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+        <span style={{ fontWeight: 700, fontSize: '0.83rem', color: '#1a202c' }}>
+          {label}
+          {obbligatorio && <span style={{ color: '#dc3545', marginLeft: 2 }}>*</span>}
+        </span>
+        {infoContent && (
+          <InfoTooltip title={infoTitle || label}>
+            {infoContent}
+          </InfoTooltip>
+        )}
+      </div>
+
+      {/* Upload row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => inputRef.current.click()}
+          style={{
+            padding: '0.3rem 0.85rem',
+            background: isOk ? '#e8f5e9' : '#1a3c6e',
+            color: isOk ? '#155724' : '#fff',
+            border: isOk ? '1.5px solid #a5d6a7' : 'none',
+            borderRadius: 5, cursor: 'pointer', fontSize: '0.82rem',
+            fontWeight: 600, transition: 'all 0.15s', whiteSpace: 'nowrap',
+          }}
+        >
+          {isOk ? '✓ Cambia file' : '📂 Scegli file'}
         </button>
-        {(caricato || stato) && (
-          <span style={styles.badge(caricato || stato === 'ok')}>
-            {caricato && stato !== 'errore' ? 'Caricato' : stato === 'errore' ? 'Errore' : msg}
+
+        {stato === 'loading' && (
+          <span style={{ fontSize: '0.78rem', color: '#6c757d' }}>Caricamento…</span>
+        )}
+        {isOk && (
+          <span style={{
+            fontSize: '0.78rem', background: '#d4edda', color: '#155724',
+            padding: '0.15rem 0.55rem', borderRadius: 10,
+          }}>
+            {msg || 'Caricato'}
           </span>
         )}
+        {stato === 'errore' && (
+          <span style={{
+            fontSize: '0.78rem', background: '#f8d7da', color: '#721c24',
+            padding: '0.15rem 0.55rem', borderRadius: 10,
+          }}>
+            ✗ {msg}
+          </span>
+        )}
+
         <input
           ref={inputRef}
           type="file"
@@ -90,9 +108,6 @@ export default function FileUploader({ tipo, label, hint }) {
           onChange={handleUpload}
         />
       </div>
-      {stato === 'errore' && <p style={{ ...styles.hint, color: '#dc3545' }}>{msg}</p>}
-      {stato === 'ok' && <p style={styles.hint}>{msg}</p>}
-      {hint && !stato && <p style={styles.hint}>{hint}</p>}
     </div>
   )
 }
