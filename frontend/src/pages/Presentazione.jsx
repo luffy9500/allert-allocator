@@ -1,5 +1,13 @@
 import React, { useState } from 'react'
 
+/* ── Stili condivisi — DEVONO stare prima di SLIDES ── */
+const p = { fontSize: '0.88rem', color: '#374151', lineHeight: 1.6 }
+const grid2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.85rem' }
+const card = { background: '#f8fafc', borderRadius: 8, padding: '1rem', border: '1px solid #e2e8f0' }
+const tag = { background: '#dbe8f8', color: '#1a3c6e', borderRadius: 20, padding: '0.2rem 0.7rem', fontSize: '0.78rem', fontWeight: 600 }
+const tagRow = { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.9rem' }
+
+/* ── Slides ── */
 const SLIDES = [
   {
     id: 1,
@@ -81,7 +89,7 @@ const SLIDES = [
           {
             step: '2', label: 'Indice di rotazione PDV',
             formula: 'Ceduto: (Q7/7)×0.5 + (Q14/14)×0.3 + (Q30/30)×0.2\nVenduto: QTA_MESE / 30',
-            note: 'Velocità di vendita/ceduto del PDV per quell\'articolo',
+            note: "Velocità di vendita/ceduto del PDV per quell'articolo",
           },
           {
             step: '3', label: 'Capacità stimata PDV',
@@ -124,9 +132,7 @@ const SLIDES = [
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         {[
           {
-            mode: 'CEDUTO CEDI',
-            color: '#1a3c6e',
-            icon: '🏭',
+            mode: 'CEDUTO CEDI', color: '#1a3c6e', icon: '🏭',
             punti: [
               'Usa lo storico di ceduto CEDI → PDV',
               'Finestra temporale 7 / 14 / 30 giorni',
@@ -136,9 +142,7 @@ const SLIDES = [
             ],
           },
           {
-            mode: 'VENDUTO PDV',
-            color: '#198754',
-            icon: '🛒',
+            mode: 'VENDUTO PDV', color: '#198754', icon: '🛒',
             punti: [
               'Usa le vendite mensili del punto vendita',
               'Un solo dato richiesto: QTA_VENDUTA_MESE',
@@ -153,8 +157,8 @@ const SLIDES = [
               {icon} {mode}
             </div>
             <ul style={{ paddingLeft: '1.1rem', margin: 0 }}>
-              {punti.map(p => (
-                <li key={p} style={{ fontSize: '0.82rem', color: '#374151', marginBottom: '0.3rem' }}>{p}</li>
+              {punti.map(punto => (
+                <li key={punto} style={{ fontSize: '0.82rem', color: '#374151', marginBottom: '0.3rem' }}>{punto}</li>
               ))}
             </ul>
           </div>
@@ -201,7 +205,7 @@ const SLIDES = [
           </table>
         </div>
         <p style={{ fontSize: '0.78rem', color: '#6c757d', marginTop: '0.6rem' }}>
-          Ordinamento: Prima Alta priorità → poi Media → poi Bassa. All'interno: capacità stimata decrescente.
+          Ordinamento: Prima Alta priorità → poi Media → poi Bassa.
         </p>
       </>
     ),
@@ -214,10 +218,10 @@ const SLIDES = [
     corpo: (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
         {[
-          { n: '1', t: 'Prepara i file Excel', d: 'Esporta CEDI_SCADENZE e CEDUTO_CEDI_PDV (o VENDITE_PDV) dai tuoi sistemi gestionali. Servono solo le colonne indicate.' },
-          { n: '2', t: 'Seleziona la modalità', d: 'In alto a destra scegli "Ceduto CEDI" se hai lo storico del ceduto, oppure "Venduto PDV" se hai le vendite mensili per punto vendita.' },
-          { n: '3', t: 'Carica e Elabora', d: 'Nella Dashboard carica i file e clicca "Elabora riallocazione". In pochi secondi hai il piano completo.' },
-          { n: '4', t: 'Esporta e invia', d: 'Clicca "Esporta Excel" per scaricare il piano operativo da inviare alla logistica o ai responsabili PDV.' },
+          { n: '1', t: 'Prepara i file Excel', d: 'Esporta CEDI_SCADENZE e CEDUTO_CEDI_PDV (o VENDITE_PDV) dai tuoi sistemi gestionali.' },
+          { n: '2', t: 'Seleziona la modalità', d: 'In alto a destra scegli "Ceduto CEDI" o "Venduto PDV" in base ai dati disponibili.' },
+          { n: '3', t: 'Carica e Elabora', d: 'Nella Dashboard carica i file e clicca "Elabora riallocazione".' },
+          { n: '4', t: 'Esporta e invia', d: 'Clicca "Esporta Excel" per scaricare il piano da inviare alla logistica.' },
         ].map(({ n, t, d }) => (
           <div key={n} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', background: '#f8fafc', borderRadius: 8, padding: '0.85rem 1rem' }}>
             <div style={{
@@ -248,13 +252,6 @@ const SLIDES = [
   },
 ]
 
-/* ── Stili condivisi ── */
-const p = { fontSize: '0.88rem', color: '#374151', lineHeight: 1.6 }
-const grid2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.85rem' }
-const card = { background: '#f8fafc', borderRadius: 8, padding: '1rem', border: '1px solid #e2e8f0' }
-const tag = { background: '#dbe8f8', color: '#1a3c6e', borderRadius: 20, padding: '0.2rem 0.7rem', fontSize: '0.78rem', fontWeight: 600 }
-const tagRow = { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.9rem' }
-
 export default function Presentazione() {
   const [slide, setSlide] = useState(0)
   const current = SLIDES[slide]
@@ -263,38 +260,25 @@ export default function Presentazione() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 780, margin: '0 auto' }}>
 
       {/* ── SLIDE CARD ── */}
-      <div style={{
-        background: '#fff', borderRadius: 12,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.09)',
-        overflow: 'hidden',
-      }}>
-        {/* Header slide */}
-        <div style={{
-          background: 'linear-gradient(135deg, #1a3c6e 0%, #2563ab 100%)',
-          padding: '1.5rem 1.75rem',
-          color: '#fff',
-        }}>
+      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.09)', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg, #1a3c6e 0%, #2563ab 100%)', padding: '1.5rem 1.75rem', color: '#fff' }}>
           <div style={{ fontSize: '2.2rem', marginBottom: '0.4rem' }}>{current.emoji}</div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>{current.titolo}</h1>
           <p style={{ margin: '0.3rem 0 0', opacity: 0.85, fontSize: '0.9rem' }}>{current.sottotitolo}</p>
-          {/* Progress */}
+          {/* Progress bar */}
           <div style={{ display: 'flex', gap: '0.3rem', marginTop: '1rem' }}>
             {SLIDES.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setSlide(i)}
-                style={{
-                  height: 4, flex: 1, border: 'none', borderRadius: 2,
-                  background: i === slide ? '#fff' : 'rgba(255,255,255,0.35)',
-                  cursor: 'pointer', padding: 0,
-                  transition: 'background 0.2s',
-                }}
-              />
+              <button key={i} onClick={() => setSlide(i)} style={{
+                height: 4, flex: 1, border: 'none', borderRadius: 2,
+                background: i === slide ? '#fff' : 'rgba(255,255,255,0.35)',
+                cursor: 'pointer', padding: 0, transition: 'background 0.2s',
+              }} />
             ))}
           </div>
         </div>
 
-        {/* Corpo slide */}
+        {/* Corpo */}
         <div style={{ padding: '1.5rem 1.75rem' }}>
           {current.corpo}
         </div>
@@ -309,31 +293,22 @@ export default function Presentazione() {
             padding: '0.45rem 1.2rem', borderRadius: 6,
             background: slide === 0 ? '#e2e8f0' : '#fff',
             color: slide === 0 ? '#adb5bd' : '#1a3c6e',
-            border: '1.5px solid #dee2e6',
-            fontWeight: 600, cursor: slide === 0 ? 'not-allowed' : 'pointer',
-            fontSize: '0.88rem',
+            border: '1.5px solid #dee2e6', fontWeight: 600,
+            cursor: slide === 0 ? 'not-allowed' : 'pointer', fontSize: '0.88rem',
           }}
         >
           ← Precedente
         </button>
-
-        <span style={{ fontSize: '0.82rem', color: '#6c757d' }}>
-          {slide + 1} / {SLIDES.length}
-        </span>
-
+        <span style={{ fontSize: '0.82rem', color: '#6c757d' }}>{slide + 1} / {SLIDES.length}</span>
         <button
           onClick={() => setSlide(s => Math.min(SLIDES.length - 1, s + 1))}
           disabled={slide === SLIDES.length - 1}
           style={{
             padding: '0.45rem 1.2rem', borderRadius: 6,
-            background: slide === SLIDES.length - 1
-              ? '#e2e8f0'
-              : 'linear-gradient(135deg,#1a3c6e,#2563ab)',
+            background: slide === SLIDES.length - 1 ? '#e2e8f0' : 'linear-gradient(135deg,#1a3c6e,#2563ab)',
             color: slide === SLIDES.length - 1 ? '#adb5bd' : '#fff',
-            border: 'none',
-            fontWeight: 600,
-            cursor: slide === SLIDES.length - 1 ? 'not-allowed' : 'pointer',
-            fontSize: '0.88rem',
+            border: 'none', fontWeight: 600,
+            cursor: slide === SLIDES.length - 1 ? 'not-allowed' : 'pointer', fontSize: '0.88rem',
             boxShadow: slide === SLIDES.length - 1 ? 'none' : '0 2px 6px rgba(26,60,110,0.25)',
           }}
         >
@@ -341,28 +316,21 @@ export default function Presentazione() {
         </button>
       </div>
 
-      {/* ── INDICE RAPIDO ── */}
-      <div style={{
-        background: '#fff', borderRadius: 10, padding: '1rem 1.5rem',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-      }}>
+      {/* ── INDICE ── */}
+      <div style={{ background: '#fff', borderRadius: 10, padding: '1rem 1.5rem', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#6c757d', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Indice
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
           {SLIDES.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => setSlide(i)}
-              style={{
-                padding: '0.25rem 0.7rem', borderRadius: 20,
-                background: i === slide ? '#1a3c6e' : '#f0f4f8',
-                color: i === slide ? '#fff' : '#495057',
-                border: 'none', cursor: 'pointer',
-                fontSize: '0.78rem', fontWeight: i === slide ? 700 : 400,
-                transition: 'all 0.15s',
-              }}
-            >
+            <button key={i} onClick={() => setSlide(i)} style={{
+              padding: '0.25rem 0.7rem', borderRadius: 20,
+              background: i === slide ? '#1a3c6e' : '#f0f4f8',
+              color: i === slide ? '#fff' : '#495057',
+              border: 'none', cursor: 'pointer',
+              fontSize: '0.78rem', fontWeight: i === slide ? 700 : 400,
+              transition: 'all 0.15s',
+            }}>
               {s.emoji} {s.titolo}
             </button>
           ))}
