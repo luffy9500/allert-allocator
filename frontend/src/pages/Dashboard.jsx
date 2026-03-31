@@ -41,11 +41,11 @@ const INFO = {
       </>
     ),
   },
-  ceduto_cedi: {
-    title: 'CEDUTO_CEDI_PDV — Cosa caricare',
+  ceduto_7gg: {
+    title: 'CEDUTO_7GG — Cosa caricare',
     content: (
       <>
-        <p>Storico del ceduto dal CEDI verso ogni PDV negli ultimi 7, 14 e 30 giorni.</p>
+        <p>Ceduto dal CEDI verso ogni PDV negli ultimi <b>7 giorni</b>. <b>Obbligatorio</b> in modalità Ceduto.</p>
         <br />
         <p><b>Colonne obbligatorie:</b></p>
         <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem' }}>
@@ -53,7 +53,37 @@ const INFO = {
           <li>NOME_PDV</li>
           <li>COD_ARTICOLO</li>
           <li>QTA_CEDUTA_7GG</li>
+        </ul>
+      </>
+    ),
+  },
+  ceduto_14gg: {
+    title: 'CEDUTO_14GG — Cosa caricare',
+    content: (
+      <>
+        <p>Ceduto dal CEDI verso ogni PDV negli ultimi <b>14 giorni</b>. Opzionale.</p>
+        <br />
+        <p><b>Colonne obbligatorie:</b></p>
+        <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem' }}>
+          <li>COD_PDV</li>
+          <li>NOME_PDV</li>
+          <li>COD_ARTICOLO</li>
           <li>QTA_CEDUTA_14GG</li>
+        </ul>
+      </>
+    ),
+  },
+  ceduto_30gg: {
+    title: 'CEDUTO_30GG — Cosa caricare',
+    content: (
+      <>
+        <p>Ceduto dal CEDI verso ogni PDV negli ultimi <b>30 giorni</b>. Opzionale.</p>
+        <br />
+        <p><b>Colonne obbligatorie:</b></p>
+        <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem' }}>
+          <li>COD_PDV</li>
+          <li>NOME_PDV</li>
+          <li>COD_ARTICOLO</li>
           <li>QTA_CEDUTA_30GG</li>
         </ul>
       </>
@@ -116,13 +146,9 @@ export default function Dashboard() {
   const [localError, setLocalError] = useState(null)
   const [downloading, setDownloading] = useState(false)
 
-  const rotazioneInfo = modalita === 'ceduto'
-    ? { tipo: 'ceduto_cedi', label: 'CEDUTO_CEDI_PDV', ...INFO.ceduto_cedi }
-    : { tipo: 'vendite_pdv', label: 'VENDITE_PDV', ...INFO.vendite_pdv }
-
   const canElabora =
     filesCaricati.cedi_scadenze &&
-    (modalita === 'ceduto' ? filesCaricati.ceduto_cedi : filesCaricati.vendite_pdv)
+    (modalita === 'ceduto' ? filesCaricati.ceduto_7gg : filesCaricati.vendite_pdv)
 
   const hasRisultato = summary !== null && allocazioni.length > 0
 
@@ -193,13 +219,37 @@ export default function Dashboard() {
             infoTitle={INFO.cedi_scadenze.title}
             infoContent={INFO.cedi_scadenze.content}
           />
-          <FileUploader
-            tipo={rotazioneInfo.tipo}
-            label={rotazioneInfo.label}
-            obbligatorio
-            infoTitle={rotazioneInfo.title}
-            infoContent={rotazioneInfo.content}
-          />
+          {modalita === 'ceduto' ? (
+            <>
+              <FileUploader
+                tipo="ceduto_7gg"
+                label="CEDUTO 7gg"
+                obbligatorio
+                infoTitle={INFO.ceduto_7gg.title}
+                infoContent={INFO.ceduto_7gg.content}
+              />
+              <FileUploader
+                tipo="ceduto_14gg"
+                label="CEDUTO 14gg"
+                infoTitle={INFO.ceduto_14gg.title}
+                infoContent={INFO.ceduto_14gg.content}
+              />
+              <FileUploader
+                tipo="ceduto_30gg"
+                label="CEDUTO 30gg"
+                infoTitle={INFO.ceduto_30gg.title}
+                infoContent={INFO.ceduto_30gg.content}
+              />
+            </>
+          ) : (
+            <FileUploader
+              tipo="vendite_pdv"
+              label="VENDITE_PDV"
+              obbligatorio
+              infoTitle={INFO.vendite_pdv.title}
+              infoContent={INFO.vendite_pdv.content}
+            />
+          )}
           <FileUploader
             tipo="anagrafica_pdv"
             label="ANAGRAFICA_PDV"

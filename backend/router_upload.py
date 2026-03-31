@@ -15,7 +15,9 @@ from fastapi import APIRouter, Header, HTTPException, UploadFile, File
 from . import session_store
 from .engine import (
     prepara_cedi,
-    prepara_ceduto_cedi,
+    prepara_ceduto_7gg,
+    prepara_ceduto_14gg,
+    prepara_ceduto_30gg,
     prepara_vendite_pdv,
     prepara_anagrafica,
 )
@@ -25,10 +27,12 @@ router = APIRouter(prefix="/api/upload", tags=["upload"])
 
 # Mappa tipo_file → (funzione di preparazione, nome attributo in SessionData)
 _TIPO_CONFIG = {
-    "cedi_scadenze": (prepara_cedi, "cedi"),
-    "ceduto_cedi": (prepara_ceduto_cedi, "ceduto"),
-    "vendite_pdv": (prepara_vendite_pdv, "vendite"),
-    "anagrafica_pdv": (prepara_anagrafica, "anagrafica"),
+    "cedi_scadenze":  (prepara_cedi,        "cedi"),
+    "ceduto_7gg":     (prepara_ceduto_7gg,  "ceduto_7gg"),
+    "ceduto_14gg":    (prepara_ceduto_14gg, "ceduto_14gg"),
+    "ceduto_30gg":    (prepara_ceduto_30gg, "ceduto_30gg"),
+    "vendite_pdv":    (prepara_vendite_pdv, "vendite"),
+    "anagrafica_pdv": (prepara_anagrafica,  "anagrafica"),
 }
 
 

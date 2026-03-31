@@ -55,16 +55,62 @@ def prepara_cedi(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def prepara_ceduto_cedi(df: pd.DataFrame) -> pd.DataFrame:
-    """Valida e normalizza il DataFrame CEDUTO_CEDI_PDV."""
-    valida_colonne(
-        df,
-        {"COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_7GG", "QTA_CEDUTA_14GG", "QTA_CEDUTA_30GG"},
-        "CEDUTO_CEDI_PDV",
-    )
+def prepara_ceduto_7gg(df: pd.DataFrame) -> pd.DataFrame:
+    """Valida e normalizza il file ceduto CEDI — finestra 7 giorni."""
+    valida_colonne(df, {"COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_7GG"}, "CEDUTO_7GG")
     df = df.copy()
-    for col in ("QTA_CEDUTA_7GG", "QTA_CEDUTA_14GG", "QTA_CEDUTA_30GG"):
-        df[col] = pd.to_numeric(df[col], errors="raise").fillna(0)
+    df["QTA_CEDUTA_7GG"] = pd.to_numeric(df["QTA_CEDUTA_7GG"], errors="raise").fillna(0)
+    return df[["COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_7GG"]]
+
+
+def prepara_ceduto_14gg(df: pd.DataFrame) -> pd.DataFrame:
+    """Valida e normalizza il file ceduto CEDI — finestra 14 giorni."""
+    valida_colonne(df, {"COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_14GG"}, "CEDUTO_14GG")
+    df = df.copy()
+    df["QTA_CEDUTA_14GG"] = pd.to_numeric(df["QTA_CEDUTA_14GG"], errors="raise").fillna(0)
+    return df[["COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_14GG"]]
+
+
+def prepara_ceduto_30gg(df: pd.DataFrame) -> pd.DataFrame:
+    """Valida e normalizza il file ceduto CEDI — finestra 30 giorni."""
+    valida_colonne(df, {"COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_30GG"}, "CEDUTO_30GG")
+    df = df.copy()
+    df["QTA_CEDUTA_30GG"] = pd.to_numeric(df["QTA_CEDUTA_30GG"], errors="raise").fillna(0)
+    return df[["COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_30GG"]]
+
+
+def unisci_ceduto(
+    df_7: pd.DataFrame,
+    df_14: pd.DataFrame | None,
+    df_30: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """
+    Fonde i tre DataFrame ceduto in uno unico compatibile con calcola_indice_ceduto().
+
+    - df_7  è obbligatorio (finestra più recente, peso 50%)
+    - df_14 e df_30 sono opzionali: se assenti le rispettive QTA valgono 0
+      (il calcolo degrada gracefully usando solo i dati disponibili)
+
+    Il join è left su df_7 → ogni PDV/articolo presente nel file 7gg
+    viene arricchito con i dati 14gg e 30gg se disponibili.
+    """
+    _CHIAVI = ["COD_PDV", "NOME_PDV", "COD_ARTICOLO"]
+    df = df_7.copy()
+
+    if df_14 is not None and not df_14.empty:
+        df = df.merge(df_14[_CHIAVI + ["QTA_CEDUTA_14GG"]], on=_CHIAVI, how="left")
+    else:
+        df["QTA_CEDUTA_14GG"] = 0.0
+
+    if df_30 is not None and not df_30.empty:
+        df = df.merge(df_30[_CHIAVI + ["QTA_CEDUTA_30GG"]], on=_CHIAVI, how="left")
+    else:
+        df["QTA_CEDUTA_30GG"] = 0.0
+
+    # Colma i NaN prodotti dal left-join con 0
+    df[["QTA_CEDUTA_7GG", "QTA_CEDUTA_14GG", "QTA_CEDUTA_30GG"]] = (
+        df[["QTA_CEDUTA_7GG", "QTA_CEDUTA_14GG", "QTA_CEDUTA_30GG"]].fillna(0)
+    )
     return df
 
 

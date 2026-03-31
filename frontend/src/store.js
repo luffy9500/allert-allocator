@@ -30,8 +30,10 @@ const useStore = create((set, get) => ({
   sessionId: getSessionId(),
   filesCaricati: {
     cedi_scadenze: false,
-    ceduto_cedi: false,
-    vendite_pdv: false,
+    ceduto_7gg:    false,
+    ceduto_14gg:   false,
+    ceduto_30gg:   false,
+    vendite_pdv:   false,
     anagrafica_pdv: false,
   },
   summary: null,

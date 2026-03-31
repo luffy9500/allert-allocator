@@ -17,7 +17,10 @@ import pandas as pd
 @dataclass
 class SessionData:
     cedi: Optional[pd.DataFrame] = None
-    ceduto: Optional[pd.DataFrame] = None
+    # Ceduto CEDI suddiviso per finestra temporale (14gg e 30gg sono opzionali)
+    ceduto_7gg:  Optional[pd.DataFrame] = None
+    ceduto_14gg: Optional[pd.DataFrame] = None
+    ceduto_30gg: Optional[pd.DataFrame] = None
     vendite: Optional[pd.DataFrame] = None
     anagrafica: Optional[pd.DataFrame] = None
     # Ultimo risultato elaborazione, mantenuto per l'export

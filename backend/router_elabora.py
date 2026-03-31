@@ -10,7 +10,7 @@ from datetime import date
 from fastapi import APIRouter, Header, HTTPException
 
 from . import session_store
-from .engine import elabora_riallocazione, assegna_priorita
+from .engine import elabora_riallocazione, assegna_priorita, unisci_ceduto
 from .models import (
     ElaboraRequest,
     ElaboraResponse,
@@ -54,13 +54,16 @@ def elabora(
     if sess.cedi is None:
         raise HTTPException(status_code=422, detail="File CEDI_SCADENZE non caricato.")
 
-    if body.modalita == "ceduto" and sess.ceduto is None:
-        raise HTTPException(status_code=422, detail="Modalità 'ceduto' richiede il file CEDUTO_CEDI_PDV.")
+    if body.modalita == "ceduto" and sess.ceduto_7gg is None:
+        raise HTTPException(status_code=422, detail="Modalità 'ceduto' richiede almeno il file CEDUTO_7GG.")
 
     if body.modalita == "venduto" and sess.vendite is None:
         raise HTTPException(status_code=422, detail="Modalità 'venduto' richiede il file VENDITE_PDV.")
 
-    rotazione_df = sess.ceduto if body.modalita == "ceduto" else sess.vendite
+    if body.modalita == "ceduto":
+        rotazione_df = unisci_ceduto(sess.ceduto_7gg, sess.ceduto_14gg, sess.ceduto_30gg)
+    else:
+        rotazione_df = sess.vendite
 
     risultato = elabora_riallocazione(
         cedi_df=sess.cedi,

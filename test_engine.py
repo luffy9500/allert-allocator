@@ -9,7 +9,9 @@ from datetime import date, timedelta
 
 from backend.engine import (
     prepara_cedi,
-    prepara_ceduto_cedi,
+    prepara_ceduto_7gg,
+    prepara_ceduto_14gg,
+    prepara_ceduto_30gg,
     prepara_vendite_pdv,
     prepara_anagrafica,
     calcola_indice_ceduto,
@@ -19,6 +21,7 @@ from backend.engine import (
     assegna_priorita,
     assegna_motivo,
     alloca_quantita,
+    unisci_ceduto,
     elabora_riallocazione,
     COEFF_CEDUTO,
     COEFF_VENDUTO,
@@ -43,11 +46,33 @@ def _cedi(giorni=10, qta=100.0, cod="ART001"):
     }])
 
 
-def _ceduto(cod="ART001", q7=14, q14=28, q30=60, cod_pdv="PDV01", nome="Super A"):
+def _ceduto_7(cod="ART001", q7=14, cod_pdv="PDV01", nome="Super A"):
     return pd.DataFrame([{
         "COD_PDV": cod_pdv, "NOME_PDV": nome, "COD_ARTICOLO": cod,
-        "QTA_CEDUTA_7GG": q7, "QTA_CEDUTA_14GG": q14, "QTA_CEDUTA_30GG": q30,
+        "QTA_CEDUTA_7GG": q7,
     }])
+
+
+def _ceduto_14(cod="ART001", q14=28, cod_pdv="PDV01", nome="Super A"):
+    return pd.DataFrame([{
+        "COD_PDV": cod_pdv, "NOME_PDV": nome, "COD_ARTICOLO": cod,
+        "QTA_CEDUTA_14GG": q14,
+    }])
+
+
+def _ceduto_30(cod="ART001", q30=60, cod_pdv="PDV01", nome="Super A"):
+    return pd.DataFrame([{
+        "COD_PDV": cod_pdv, "NOME_PDV": nome, "COD_ARTICOLO": cod,
+        "QTA_CEDUTA_30GG": q30,
+    }])
+
+
+def _ceduto(cod="ART001", q7=14, q14=28, q30=60, cod_pdv="PDV01", nome="Super A"):
+    """Helper che costruisce il DataFrame ceduto unificato (già mergiato)."""
+    df7  = prepara_ceduto_7gg(_ceduto_7(cod=cod, q7=q7, cod_pdv=cod_pdv, nome=nome))
+    df14 = prepara_ceduto_14gg(_ceduto_14(cod=cod, q14=q14, cod_pdv=cod_pdv, nome=nome))
+    df30 = prepara_ceduto_30gg(_ceduto_30(cod=cod, q30=q30, cod_pdv=cod_pdv, nome=nome))
+    return unisci_ceduto(df7, df14, df30)
 
 
 def _vendite(cod="ART001", mese=90, cod_pdv="PDV01", nome="Super A"):
@@ -76,10 +101,20 @@ class TestValidazione:
         with pytest.raises(ValueError, match="CEDI_SCADENZE"):
             prepara_cedi(df)
 
-    def test_ceduto_colonne_mancanti(self):
+    def test_ceduto_7gg_colonne_mancanti(self):
         df = pd.DataFrame([{"COD_PDV": "P1"}])
-        with pytest.raises(ValueError, match="CEDUTO_CEDI_PDV"):
-            prepara_ceduto_cedi(df)
+        with pytest.raises(ValueError, match="CEDUTO_7GG"):
+            prepara_ceduto_7gg(df)
+
+    def test_ceduto_14gg_colonne_mancanti(self):
+        df = pd.DataFrame([{"COD_PDV": "P1"}])
+        with pytest.raises(ValueError, match="CEDUTO_14GG"):
+            prepara_ceduto_14gg(df)
+
+    def test_ceduto_30gg_colonne_mancanti(self):
+        df = pd.DataFrame([{"COD_PDV": "P1"}])
+        with pytest.raises(ValueError, match="CEDUTO_30GG"):
+            prepara_ceduto_30gg(df)
 
     def test_vendite_colonne_mancanti(self):
         df = pd.DataFrame([{"COD_PDV": "P1"}])
@@ -268,7 +303,7 @@ class TestElaboraRiallocazione:
 
     def test_modalita_ceduto_colonne_output(self):
         cedi = prepara_cedi(_cedi(giorni=10, qta=50))
-        ceduto = prepara_ceduto_cedi(_ceduto())
+        ceduto = _ceduto()
         result = elabora_riallocazione(cedi, ceduto, None, "ceduto")
         df = result["allocazioni"]
         expected = {
@@ -288,7 +323,7 @@ class TestElaboraRiallocazione:
 
     def test_ceduto_scaduto_produce_avviso(self):
         cedi = prepara_cedi(_cedi(giorni=-1))  # già scaduto
-        ceduto = prepara_ceduto_cedi(_ceduto())
+        ceduto = _ceduto()
         result = elabora_riallocazione(cedi, ceduto, None, "ceduto")
         assert result["allocazioni"].empty
         assert len(result["avvisi"]) == 1
@@ -296,20 +331,20 @@ class TestElaboraRiallocazione:
 
     def test_articolo_senza_storico_produce_avviso(self):
         cedi = prepara_cedi(_cedi(cod="ART999"))
-        ceduto = prepara_ceduto_cedi(_ceduto(cod="ART001"))
+        ceduto = _ceduto(cod="ART001")
         result = elabora_riallocazione(cedi, ceduto, None, "ceduto")
         assert result["allocazioni"].empty
         assert len(result["avvisi"]) == 1
 
     def test_qta_non_supera_disponibile(self):
         cedi = prepara_cedi(_cedi(qta=10.0, giorni=10))
-        ceduto = prepara_ceduto_cedi(_ceduto(q7=7, q14=14, q30=30))
+        ceduto = _ceduto(q7=7, q14=14, q30=30)
         result = elabora_riallocazione(cedi, ceduto, None, "ceduto")
         assert result["allocazioni"]["QTA_PROPOSTA"].sum() <= 10
 
     def test_summary_contiene_campi_attesi(self):
         cedi = prepara_cedi(_cedi())
-        ceduto = prepara_ceduto_cedi(_ceduto())
+        ceduto = _ceduto()
         result = elabora_riallocazione(cedi, ceduto, None, "ceduto")
         s = result["summary"]
         for campo in ("totale_stock", "quantita_a_rischio", "referenze_critiche",
@@ -319,14 +354,14 @@ class TestElaboraRiallocazione:
 
     def test_pdv_non_attivo_escluso(self):
         cedi = prepara_cedi(_cedi(qta=50, giorni=10))
-        ceduto = prepara_ceduto_cedi(_ceduto(cod_pdv="PDV01"))
+        ceduto = _ceduto(cod_pdv="PDV01")
         anag = prepara_anagrafica(_anagrafica(cod_pdv="PDV01", attivo=False))
         result = elabora_riallocazione(cedi, ceduto, anag, "ceduto")
         assert result["allocazioni"].empty
 
     def test_priorita_alta_per_giorni_critici(self):
         cedi = prepara_cedi(_cedi(giorni=3, qta=5))
-        ceduto = prepara_ceduto_cedi(_ceduto(q7=7, q14=14, q30=30))
+        ceduto = _ceduto(q7=7, q14=14, q30=30)
         result = elabora_riallocazione(cedi, ceduto, None, "ceduto")
         df = result["allocazioni"]
         if not df.empty:
@@ -338,7 +373,59 @@ class TestElaboraRiallocazione:
         # Ma 0.7 < 1 quindi la QTA viene arrotondata a 0 → avviso non allocata
         # Usiamo giorni=2 per avere capacità 1.4 → floor=1 ma con qta=1000 residuo > 0
         cedi = prepara_cedi(_cedi(qta=1000.0, giorni=2))
-        ceduto = prepara_ceduto_cedi(_ceduto(q7=7, q14=14, q30=30))
+        ceduto = _ceduto(q7=7, q14=14, q30=30)
         result = elabora_riallocazione(cedi, ceduto, None, "ceduto")
         avvisi_non_alloc = [a for a in result["avvisi"] if "non allocata" in a]
         assert len(avvisi_non_alloc) == 1
+
+
+# ---------------------------------------------------------------------------
+# Merge ceduto: unisci_ceduto()
+# ---------------------------------------------------------------------------
+
+class TestUnisciCeduto:
+
+    def test_tutti_e_tre_presenti(self):
+        df7  = prepara_ceduto_7gg(_ceduto_7(q7=7))
+        df14 = prepara_ceduto_14gg(_ceduto_14(q14=14))
+        df30 = prepara_ceduto_30gg(_ceduto_30(q30=30))
+        merged = unisci_ceduto(df7, df14, df30)
+        assert list(merged.columns) == ["COD_PDV", "NOME_PDV", "COD_ARTICOLO",
+                                         "QTA_CEDUTA_7GG", "QTA_CEDUTA_14GG", "QTA_CEDUTA_30GG"]
+        assert merged["QTA_CEDUTA_7GG"].iloc[0] == 7
+        assert merged["QTA_CEDUTA_14GG"].iloc[0] == 14
+        assert merged["QTA_CEDUTA_30GG"].iloc[0] == 30
+
+    def test_solo_7gg_obbligatorio(self):
+        df7 = prepara_ceduto_7gg(_ceduto_7(q7=21))
+        merged = unisci_ceduto(df7, None, None)
+        assert merged["QTA_CEDUTA_7GG"].iloc[0] == 21
+        assert merged["QTA_CEDUTA_14GG"].iloc[0] == 0.0
+        assert merged["QTA_CEDUTA_30GG"].iloc[0] == 0.0
+
+    def test_senza_14gg(self):
+        df7  = prepara_ceduto_7gg(_ceduto_7(q7=7))
+        df30 = prepara_ceduto_30gg(_ceduto_30(q30=30))
+        merged = unisci_ceduto(df7, None, df30)
+        assert merged["QTA_CEDUTA_14GG"].iloc[0] == 0.0
+        assert merged["QTA_CEDUTA_30GG"].iloc[0] == 30
+
+    def test_senza_30gg(self):
+        df7  = prepara_ceduto_7gg(_ceduto_7(q7=7))
+        df14 = prepara_ceduto_14gg(_ceduto_14(q14=14))
+        merged = unisci_ceduto(df7, df14, None)
+        assert merged["QTA_CEDUTA_14GG"].iloc[0] == 14
+        assert merged["QTA_CEDUTA_30GG"].iloc[0] == 0.0
+
+    def test_merge_preserva_tutti_i_pdv(self):
+        df7 = prepara_ceduto_7gg(pd.DataFrame([
+            {"COD_PDV": "P1", "NOME_PDV": "A", "COD_ARTICOLO": "ART1", "QTA_CEDUTA_7GG": 7},
+            {"COD_PDV": "P2", "NOME_PDV": "B", "COD_ARTICOLO": "ART1", "QTA_CEDUTA_7GG": 14},
+        ]))
+        df14 = prepara_ceduto_14gg(pd.DataFrame([
+            {"COD_PDV": "P1", "NOME_PDV": "A", "COD_ARTICOLO": "ART1", "QTA_CEDUTA_14GG": 10},
+        ]))
+        merged = unisci_ceduto(df7, df14, None)
+        assert len(merged) == 2
+        p2 = merged[merged["COD_PDV"] == "P2"]
+        assert p2["QTA_CEDUTA_14GG"].iloc[0] == 0.0  # assente in 14gg → 0
