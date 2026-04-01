@@ -50,6 +50,9 @@ def prepara_cedi(df: pd.DataFrame) -> pd.DataFrame:
         "CEDI_SCADENZE",
     )
     df = df.copy()
+    df["LOTTO"] = df["LOTTO"].astype(str)
+    df["COD_ARTICOLO"] = df["COD_ARTICOLO"].astype(str)
+    df["DESCRIZIONE_ARTICOLO"] = df["DESCRIZIONE_ARTICOLO"].astype(str)
     df["DATA_SCADENZA"] = pd.to_datetime(df["DATA_SCADENZA"])
     df["QTA_DISPONIBILE"] = pd.to_numeric(df["QTA_DISPONIBILE"], errors="raise")
     return df
@@ -59,6 +62,9 @@ def prepara_ceduto_7gg(df: pd.DataFrame) -> pd.DataFrame:
     """Valida e normalizza il file ceduto CEDI — finestra 7 giorni."""
     valida_colonne(df, {"COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_7GG"}, "CEDUTO_7GG")
     df = df.copy()
+    df["COD_PDV"] = df["COD_PDV"].astype(str)
+    df["NOME_PDV"] = df["NOME_PDV"].astype(str)
+    df["COD_ARTICOLO"] = df["COD_ARTICOLO"].astype(str)
     df["QTA_CEDUTA_7GG"] = pd.to_numeric(df["QTA_CEDUTA_7GG"], errors="raise").fillna(0)
     return df[["COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_7GG"]]
 
@@ -67,6 +73,9 @@ def prepara_ceduto_14gg(df: pd.DataFrame) -> pd.DataFrame:
     """Valida e normalizza il file ceduto CEDI — finestra 14 giorni."""
     valida_colonne(df, {"COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_14GG"}, "CEDUTO_14GG")
     df = df.copy()
+    df["COD_PDV"] = df["COD_PDV"].astype(str)
+    df["NOME_PDV"] = df["NOME_PDV"].astype(str)
+    df["COD_ARTICOLO"] = df["COD_ARTICOLO"].astype(str)
     df["QTA_CEDUTA_14GG"] = pd.to_numeric(df["QTA_CEDUTA_14GG"], errors="raise").fillna(0)
     return df[["COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_14GG"]]
 
@@ -75,6 +84,9 @@ def prepara_ceduto_30gg(df: pd.DataFrame) -> pd.DataFrame:
     """Valida e normalizza il file ceduto CEDI — finestra 30 giorni."""
     valida_colonne(df, {"COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_30GG"}, "CEDUTO_30GG")
     df = df.copy()
+    df["COD_PDV"] = df["COD_PDV"].astype(str)
+    df["NOME_PDV"] = df["NOME_PDV"].astype(str)
+    df["COD_ARTICOLO"] = df["COD_ARTICOLO"].astype(str)
     df["QTA_CEDUTA_30GG"] = pd.to_numeric(df["QTA_CEDUTA_30GG"], errors="raise").fillna(0)
     return df[["COD_PDV", "NOME_PDV", "COD_ARTICOLO", "QTA_CEDUTA_30GG"]]
 
@@ -122,6 +134,9 @@ def prepara_vendite_pdv(df: pd.DataFrame) -> pd.DataFrame:
         "VENDITE_PDV",
     )
     df = df.copy()
+    df["COD_PDV"] = df["COD_PDV"].astype(str)
+    df["NOME_PDV"] = df["NOME_PDV"].astype(str)
+    df["COD_ARTICOLO"] = df["COD_ARTICOLO"].astype(str)
     df["QTA_VENDUTA_MESE"] = pd.to_numeric(df["QTA_VENDUTA_MESE"], errors="raise").fillna(0)
     return df
 
@@ -134,6 +149,7 @@ def prepara_anagrafica(df: pd.DataFrame) -> pd.DataFrame:
         "ANAGRAFICA_PDV",
     )
     df = df.copy()
+    df["COD_PDV"] = df["COD_PDV"].astype(str)
     # Normalizza ATTIVO a bool (accetta True/False, 1/0, "si"/"no", "true"/"false")
     _truthy = {"true", "1", "si", "yes", "s", "y"}
     # Converte sempre a stringa per gestire uniformemente object, StringDtype e bool

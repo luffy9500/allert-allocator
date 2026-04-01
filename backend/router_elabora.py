@@ -81,18 +81,18 @@ def elabora(
     s = risultato["summary"]
     allocazioni = [
         AllocazioneRow(
-            lotto=row["LOTTO"],
-            cod_articolo=row["COD_ARTICOLO"],
-            descrizione_articolo=row["DESCRIZIONE_ARTICOLO"],
-            cod_pdv=row["COD_PDV"],
-            nome_pdv=row["NOME_PDV"],
+            lotto=str(row["LOTTO"]),
+            cod_articolo=str(row["COD_ARTICOLO"]),
+            descrizione_articolo=str(row["DESCRIZIONE_ARTICOLO"]),
+            cod_pdv=str(row["COD_PDV"]),
+            nome_pdv=str(row["NOME_PDV"]),
             giorni_residui=int(row["GIORNI_RESIDUI"]),
             indice_rot=float(row["INDICE_ROT"]),
             capacita_stimata=float(row["CAPACITA_STIMATA"]),
             qta_proposta=int(row["QTA_PROPOSTA"]),
-            priorita=row["PRIORITA"],
-            motivo=row["MOTIVO"],
-            modalita_calcolo=row["MODALITA_CALCOLO"],
+            priorita=str(row["PRIORITA"]),
+            motivo=str(row["MOTIVO"]),
+            modalita_calcolo=str(row["MODALITA_CALCOLO"]),
         )
         for _, row in risultato["allocazioni"].iterrows()
     ]
