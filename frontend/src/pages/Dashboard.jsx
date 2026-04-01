@@ -17,7 +17,8 @@ const INFO = {
           <li>LOTTO</li>
           <li>COD_ARTICOLO</li>
           <li>DESCRIZIONE_ARTICOLO</li>
-          <li>QTA_DISPONIBILE</li>
+          <li>QTA_DISPONIBILE_COLLI</li>
+          <li>QTA_DISPONIBILE_PEZZI</li>
           <li>DATA_SCADENZA (gg/mm/aaaa)</li>
         </ul>
       </>
@@ -45,14 +46,13 @@ const INFO = {
     title: 'CEDUTO_7GG — Cosa caricare',
     content: (
       <>
-        <p>Ceduto dal CEDI verso ogni PDV negli ultimi <b>7 giorni</b>. <b>Obbligatorio</b> in modalità Ceduto.</p>
+        <p>Ceduto CEDI → PDV ultimi <b>7 giorni</b>. <b>Obbligatorio</b> in modalità Ceduto.</p>
         <br />
         <p><b>Colonne obbligatorie:</b></p>
         <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem' }}>
-          <li>COD_PDV</li>
-          <li>NOME_PDV</li>
-          <li>COD_ARTICOLO</li>
-          <li>QTA_CEDUTA_7GG</li>
+          <li>COD_PDV, NOME_PDV, COD_ARTICOLO</li>
+          <li>QTA_CEDUTA_7GG_COLLI</li>
+          <li>QTA_CEDUTA_7GG_PEZZI</li>
         </ul>
       </>
     ),
@@ -61,14 +61,13 @@ const INFO = {
     title: 'CEDUTO_14GG — Cosa caricare',
     content: (
       <>
-        <p>Ceduto dal CEDI verso ogni PDV negli ultimi <b>14 giorni</b>. Opzionale.</p>
+        <p>Ceduto CEDI → PDV ultimi <b>14 giorni</b>. Opzionale.</p>
         <br />
         <p><b>Colonne obbligatorie:</b></p>
         <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem' }}>
-          <li>COD_PDV</li>
-          <li>NOME_PDV</li>
-          <li>COD_ARTICOLO</li>
-          <li>QTA_CEDUTA_14GG</li>
+          <li>COD_PDV, NOME_PDV, COD_ARTICOLO</li>
+          <li>QTA_CEDUTA_14GG_COLLI</li>
+          <li>QTA_CEDUTA_14GG_PEZZI</li>
         </ul>
       </>
     ),
@@ -77,14 +76,28 @@ const INFO = {
     title: 'CEDUTO_30GG — Cosa caricare',
     content: (
       <>
-        <p>Ceduto dal CEDI verso ogni PDV negli ultimi <b>30 giorni</b>. Opzionale.</p>
+        <p>Ceduto CEDI → PDV ultimi <b>30 giorni</b>. Opzionale.</p>
         <br />
         <p><b>Colonne obbligatorie:</b></p>
         <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem' }}>
-          <li>COD_PDV</li>
-          <li>NOME_PDV</li>
-          <li>COD_ARTICOLO</li>
-          <li>QTA_CEDUTA_30GG</li>
+          <li>COD_PDV, NOME_PDV, COD_ARTICOLO</li>
+          <li>QTA_CEDUTA_30GG_COLLI</li>
+          <li>QTA_CEDUTA_30GG_PEZZI</li>
+        </ul>
+      </>
+    ),
+  },
+  ceduto_60gg: {
+    title: 'CEDUTO_60GG — Cosa caricare',
+    content: (
+      <>
+        <p>Ceduto CEDI → PDV ultimi <b>60 giorni</b>. Opzionale. Quando presente, attiva la formula estesa a 4 finestre temporali.</p>
+        <br />
+        <p><b>Colonne obbligatorie:</b></p>
+        <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem' }}>
+          <li>COD_PDV, NOME_PDV, COD_ARTICOLO</li>
+          <li>QTA_CEDUTA_60GG_COLLI</li>
+          <li>QTA_CEDUTA_60GG_PEZZI</li>
         </ul>
       </>
     ),
@@ -97,10 +110,9 @@ const INFO = {
         <br />
         <p><b>Colonne obbligatorie:</b></p>
         <ul style={{ paddingLeft: '1rem', marginTop: '0.3rem' }}>
-          <li>COD_PDV</li>
-          <li>NOME_PDV</li>
-          <li>COD_ARTICOLO</li>
-          <li>QTA_VENDUTA_MESE</li>
+          <li>COD_PDV, NOME_PDV, COD_ARTICOLO</li>
+          <li>QTA_VENDUTA_MESE_COLLI</li>
+          <li>QTA_VENDUTA_MESE_PEZZI</li>
         </ul>
       </>
     ),
@@ -240,6 +252,12 @@ export default function Dashboard() {
                 label="CEDUTO 30gg"
                 infoTitle={INFO.ceduto_30gg.title}
                 infoContent={INFO.ceduto_30gg.content}
+              />
+              <FileUploader
+                tipo="ceduto_60gg"
+                label="CEDUTO 60gg"
+                infoTitle={INFO.ceduto_60gg.title}
+                infoContent={INFO.ceduto_60gg.content}
               />
             </>
           ) : (

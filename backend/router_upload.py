@@ -18,6 +18,7 @@ from .engine import (
     prepara_ceduto_7gg,
     prepara_ceduto_14gg,
     prepara_ceduto_30gg,
+    prepara_ceduto_60gg,
     prepara_vendite_pdv,
     prepara_anagrafica,
 )
@@ -31,6 +32,7 @@ _TIPO_CONFIG = {
     "ceduto_7gg":     (prepara_ceduto_7gg,  "ceduto_7gg"),
     "ceduto_14gg":    (prepara_ceduto_14gg, "ceduto_14gg"),
     "ceduto_30gg":    (prepara_ceduto_30gg, "ceduto_30gg"),
+    "ceduto_60gg":    (prepara_ceduto_60gg, "ceduto_60gg"),
     "vendite_pdv":    (prepara_vendite_pdv, "vendite"),
     "anagrafica_pdv": (prepara_anagrafica,  "anagrafica"),
 }

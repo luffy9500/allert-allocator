@@ -53,9 +53,11 @@ class AllocazioneRow(BaseModel):
     indice_rot: float
     capacita_stimata: float
     qta_proposta: int
+    um: str                              # "colli" (ceduto) | "pezzi" (venduto)
     priorita: str
     motivo: str
     modalita_calcolo: str
+    sconto_proposto: float | None = None  # es. 0.25 = 25%; None = nessuno sconto
 
 
 class ElaboraResponse(BaseModel):

@@ -61,7 +61,9 @@ def elabora(
         raise HTTPException(status_code=422, detail="Modalità 'venduto' richiede il file VENDITE_PDV.")
 
     if body.modalita == "ceduto":
-        rotazione_df = unisci_ceduto(sess.ceduto_7gg, sess.ceduto_14gg, sess.ceduto_30gg)
+        rotazione_df = unisci_ceduto(
+            sess.ceduto_7gg, sess.ceduto_14gg, sess.ceduto_30gg, sess.ceduto_60gg
+        )
     else:
         rotazione_df = sess.vendite
 
@@ -90,9 +92,11 @@ def elabora(
             indice_rot=float(row["INDICE_ROT"]),
             capacita_stimata=float(row["CAPACITA_STIMATA"]),
             qta_proposta=int(row["QTA_PROPOSTA"]),
+            um=str(row["UM"]),
             priorita=str(row["PRIORITA"]),
             motivo=str(row["MOTIVO"]),
             modalita_calcolo=str(row["MODALITA_CALCOLO"]),
+            sconto_proposto=float(row["SCONTO_PROPOSTO"]) if row["SCONTO_PROPOSTO"] is not None else None,
         )
         for _, row in risultato["allocazioni"].iterrows()
     ]
