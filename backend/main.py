@@ -10,11 +10,13 @@ In produzione (Vercel):
     dalla directory frontend/dist costruita durante il deploy.
 """
 
+import traceback
+
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .router_upload import router as upload_router
@@ -44,6 +46,15 @@ app.add_middleware(
 app.include_router(upload_router)
 app.include_router(elabora_router)
 app.include_router(export_router)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Restituisce sempre JSON per le eccezioni non gestite (evita plain-text 500 da Vercel)."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()},
+    )
 
 
 @app.get("/api/health")

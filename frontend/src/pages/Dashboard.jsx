@@ -161,7 +161,8 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json', ...apiHeaders() },
         body: JSON.stringify({ modalita }),
       })
-      const data = await res.json()
+      let data
+      try { data = await res.json() } catch (_) { data = { detail: await res.text() } }
       if (!res.ok) {
         setLocalError(data.detail || "Errore durante l'elaborazione")
       } else {
