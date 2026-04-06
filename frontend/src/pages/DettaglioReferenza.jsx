@@ -56,17 +56,29 @@ export default function DettaglioReferenza() {
         </div>
 
         {/* Barra stock */}
-        <div style={{ display: 'flex', gap: '2rem', fontSize: '0.88rem', color: '#495057', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.88rem', color: '#495057', flexWrap: 'wrap', alignItems: 'center' }}>
           <span><b>Qta disponibile:</b> {dati.qta_disponibile?.toLocaleString('it-IT')}</span>
-          <span><b>Qta allocata:</b> <span style={{ color: '#198754', fontWeight: 700 }}>{dati.qta_allocata?.toLocaleString('it-IT')}</span> ({percentAllocata}%)</span>
-          <span><b>Lotti:</b> {dati.lotti?.join(', ')}</span>
-          {dati.sconto_proposto != null && (
-            <span style={{ background: '#fff3cd', color: '#856404', borderRadius: 6, padding: '0.2rem 0.75rem', fontWeight: 700 }}>
-              Sconto suggerito: -{Math.round(dati.sconto_proposto * 100)}%
-              <span style={{ fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>({dati.qta_disponibile - dati.qta_allocata} unità non allocate)</span>
+          <span><b>Qta allocata:</b> <span style={{ color: '#198754', fontWeight: 700 }}>{dati.qta_allocata?.toLocaleString('it-IT')}</span></span>
+          <span>
+            <b>Qta residua:</b>{' '}
+            <span style={{ color: (dati.qta_disponibile - dati.qta_allocata) > 0 ? '#dc3545' : '#198754', fontWeight: 700 }}>
+              {(dati.qta_disponibile - dati.qta_allocata).toLocaleString('it-IT')}
             </span>
-          )}
+            {' '}({percentAllocata}% allocato)
+          </span>
+          <span><b>Lotti:</b> {dati.lotti?.join(', ')}</span>
         </div>
+        {dati.sconto_proposto != null && (
+          <div style={{ marginTop: '0.65rem', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 6, padding: '0.5rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>💰</span>
+            <span style={{ color: '#856404', fontWeight: 700, fontSize: '0.88rem' }}>
+              Sconto prezzo suggerito: -{Math.round(dati.sconto_proposto * 100)}%
+            </span>
+            <span style={{ color: '#856404', fontSize: '0.8rem' }}>
+              — {(dati.qta_disponibile - dati.qta_allocata).toLocaleString('it-IT')} unità non allocate
+            </span>
+          </div>
+        )}
 
         {/* Progress bar allocazione */}
         <div style={{ marginTop: '0.85rem', background: '#e9ecef', borderRadius: 4, height: 8 }}>

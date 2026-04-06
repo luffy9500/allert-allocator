@@ -290,13 +290,28 @@ class TestProponiSconto:
         assert proponi_sconto(10.0, 100.0, 5) == pytest.approx(0.25)
 
     def test_sconto_20_alta_frazione_giorni_10(self):
-        assert proponi_sconto(60.0, 100.0, 10) == pytest.approx(0.20)
+        # frac=0.50 > 0.40 → 20%
+        assert proponi_sconto(50.0, 100.0, 10) == pytest.approx(0.20)
 
-    def test_sconto_15_media_frazione_giorni_7(self):
-        assert proponi_sconto(30.0, 100.0, 7) == pytest.approx(0.15)
+    def test_sconto_20_non_scatta_frac_bassa_giorni_10(self):
+        # frac=0.30 ≤ 0.40 → nessun 20%; ma giorni=10 ≤ 15 e frac=0.30 > 0.25 → 15%
+        assert proponi_sconto(30.0, 100.0, 10) == pytest.approx(0.15)
+
+    def test_sconto_15_media_frazione_giorni_15(self):
+        # giorni=15 ≤ 15 e frac=0.30 > 0.25 → 15%
+        assert proponi_sconto(30.0, 100.0, 15) == pytest.approx(0.15)
+
+    def test_sconto_10_bassa_frazione_giorni_20(self):
+        # giorni=20 ≤ 20 e frac=0.20 > 0.15 → 10%
+        assert proponi_sconto(20.0, 100.0, 20) == pytest.approx(0.10)
 
     def test_nessuno_sconto_bassa_urgenza(self):
-        assert proponi_sconto(5.0, 100.0, 20) is None
+        # giorni=21 > 20 → None
+        assert proponi_sconto(20.0, 100.0, 21) is None
+
+    def test_nessuno_sconto_frac_troppo_bassa(self):
+        # giorni=20 ma frac=0.10 ≤ 0.15 → None
+        assert proponi_sconto(10.0, 100.0, 20) is None
 
 
 # ---------------------------------------------------------------------------

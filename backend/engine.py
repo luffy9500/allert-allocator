@@ -304,12 +304,13 @@ def proponi_sconto(
     Propone uno sconto percentuale (es. 0.25 = 25%) quando una quota significativa
     dello stock non riesce a essere allocata ai PDV entro la scadenza.
 
-    Logica:
-      - giorni ≤ 2                             → 40%
-      - giorni ≤ 5                             → 25%
-      - giorni ≤ 7  e non-allocato > 25% stock → 15%
-      - giorni ≤ 10 e non-allocato > 50% stock → 20%
-      - altrimenti                             → None
+    Logica (soglie in ordine decrescente di urgenza):
+      - giorni ≤ 2                              → 40%
+      - giorni ≤ 5                              → 25%
+      - giorni ≤ 10 e non-allocato > 40% stock  → 20%
+      - giorni ≤ 15 e non-allocato > 25% stock  → 15%
+      - giorni ≤ 20 e non-allocato > 15% stock  → 10%
+      - altrimenti                              → None
     """
     if qta_non_allocata <= 0:
         return None
@@ -318,10 +319,12 @@ def proponi_sconto(
         return 0.40
     if giorni_residui <= 5:
         return 0.25
-    if giorni_residui <= 10 and frac > 0.50:
+    if giorni_residui <= 10 and frac > 0.40:
         return 0.20
-    if giorni_residui <= 7 and frac > 0.25:
+    if giorni_residui <= 15 and frac > 0.25:
         return 0.15
+    if giorni_residui <= 20 and frac > 0.15:
+        return 0.10
     return None
 
 

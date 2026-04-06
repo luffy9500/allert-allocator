@@ -31,9 +31,9 @@ export default function ElencoReferenze() {
         <InfoTooltip title="Come leggere questa pagina">
           <ul style={{ paddingLeft: '1rem', lineHeight: 1.8 }}>
             <li><b>Giorni Residui:</b> giorni alla scadenza da oggi (lotto più urgente)</li>
-            <li><b>PDV Idonei:</b> punti vendita a cui è stata assegnata la referenza</li>
             <li><b>Qta Allocata:</b> totale unità assegnate ai PDV</li>
-            <li><b>Sconto:</b> suggerimento sconto se stock non completamente allocato</li>
+            <li><b>Qta Residua:</b> stock non allocato (rosso = da smaltire)</li>
+            <li><b>Sconto:</b> sconto prezzo suggerito se la Qta Residua è elevata</li>
             <li><b>Priorità Alta:</b> ≤ 5 giorni residui</li>
             <li>Clicca una riga per vedere il dettaglio PDV</li>
           </ul>
@@ -67,7 +67,7 @@ export default function ElencoReferenze() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                {['Cod. Articolo', 'Descrizione', 'Scadenza', 'Giorni Res.', 'Qta Disp.', 'Qta Allocata', 'PDV Idonei', 'Sconto', 'Priorità'].map(h => (
+                {['Cod. Articolo', 'Descrizione', 'Scadenza', 'Giorni Res.', 'Qta Disp.', 'Qta Allocata', 'Qta Residua', 'PDV Idonei', 'Sconto', 'Priorità'].map(h => (
                   <th key={h} style={{ padding: '0.6rem 0.85rem', textAlign: 'left', fontWeight: 600, color: '#495057', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -75,7 +75,7 @@ export default function ElencoReferenze() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: '#6c757d' }}>
+                  <td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: '#6c757d' }}>
                     Nessun dato disponibile.
                   </td>
                 </tr>
@@ -97,6 +97,9 @@ export default function ElencoReferenze() {
                   <td style={{ padding: '0.55rem 0.85rem', fontWeight: 700, color: PRIORITA_COLOR[row.priorita] }}>{row.giorni_residui}</td>
                   <td style={{ padding: '0.55rem 0.85rem' }}>{row.qta_disponibile?.toLocaleString('it-IT')}</td>
                   <td style={{ padding: '0.55rem 0.85rem', fontWeight: 600, color: '#198754' }}>{row.qta_allocata?.toLocaleString('it-IT')}</td>
+                  <td style={{ padding: '0.55rem 0.85rem', fontWeight: 600, color: (row.qta_disponibile - row.qta_allocata) > 0 ? '#dc3545' : '#198754' }}>
+                    {(row.qta_disponibile - row.qta_allocata).toLocaleString('it-IT')}
+                  </td>
                   <td style={{ padding: '0.55rem 0.85rem' }}>{row.n_pdv_idonei}</td>
                   <td style={{ padding: '0.55rem 0.85rem' }}>
                     {row.sconto_proposto != null
