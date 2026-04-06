@@ -144,7 +144,7 @@ def elenco_referenze(
             descrizione_articolo=str(row["DESCRIZIONE_ARTICOLO"]),
             data_scadenza=row["DATA_SCADENZA"].date().isoformat(),
             giorni_residui=giorni,
-            qta_disponibile=float(row["QTA_DISPONIBILE"]),
+            qta_disponibile=float(row["QTA_DISPONIBILE_COLLI"]),
             n_pdv_idonei=n_pdv,
             priorita=assegna_priorita(giorni),
         ))
@@ -198,7 +198,7 @@ def dettaglio_referenza(
         cod_articolo=cod_articolo,
         descrizione_articolo=str(row["DESCRIZIONE_ARTICOLO"]),
         giorni_residui=giorni,
-        qta_disponibile=float(row["QTA_DISPONIBILE"]),
+        qta_disponibile=float(row["QTA_DISPONIBILE_COLLI"]),
         priorita=assegna_priorita(giorni),
         pdv=pdv_list,
     )

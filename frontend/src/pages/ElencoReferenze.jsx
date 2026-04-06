@@ -29,7 +29,9 @@ export default function ElencoReferenze() {
     setErrore(null)
     fetch('/api/referenze', { headers: apiHeaders() })
       .then(r => {
-        if (!r.ok) throw new Error('Elaborare prima i dati dalla Dashboard.')
+        if (!r.ok) return r.json()
+          .then(d => { throw new Error(d.detail || 'Elaborare prima i dati dalla Dashboard.') })
+          .catch(e => { throw e.message ? e : new Error('Elaborare prima i dati dalla Dashboard.') })
         return r.json()
       })
       .then(d => setReferenze(d.referenze))
