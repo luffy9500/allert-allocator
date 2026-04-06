@@ -60,10 +60,40 @@ class AllocazioneRow(BaseModel):
     sconto_proposto: float | None = None  # es. 0.25 = 25%; None = nessuno sconto
 
 
+class PDVAssignment(BaseModel):
+    """Singola assegnazione PDV nell'ambito di una referenza completa."""
+    lotto: str
+    cod_pdv: str
+    nome_pdv: str
+    qta_proposta: int
+    um: str
+    indice_rot: float
+    capacita_stimata: float
+    motivo: str
+    sconto_proposto: float | None = None
+
+
+class ReferenzaCompletaRow(BaseModel):
+    """Riepilogo per articolo con tutti i PDV assegnati. Incluso in ElaboraResponse
+    per permettere al frontend di navigare senza ri-chiamare il server."""
+    cod_articolo: str
+    descrizione_articolo: str
+    data_scadenza: str          # scadenza più urgente tra i lotti
+    giorni_residui: int         # della scadenza più urgente
+    qta_disponibile: float      # somma su tutti i lotti
+    qta_allocata: float
+    n_pdv_idonei: int
+    priorita: str
+    sconto_proposto: float | None = None
+    lotti: list[str]
+    pdv: list[PDVAssignment]
+
+
 class ElaboraResponse(BaseModel):
     summary: SummaryStats
     allocazioni: list[AllocazioneRow]
     avvisi: list[str]
+    referenze: list[ReferenzaCompletaRow] = []
 
 
 # ---------------------------------------------------------------------------

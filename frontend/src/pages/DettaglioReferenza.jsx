@@ -1,96 +1,118 @@
-/**
- * Dettaglio Referenza — ranking PDV con capacità stimata e quantità proposta.
- */
-
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import useStore from '../store.js'
-import DataTable from '../components/DataTable.jsx'
-
-const PDV_COLUMNS = [
-  { key: 'cod_pdv',         label: 'Cod. PDV' },
-  { key: 'nome_pdv',        label: 'Nome PDV' },
-  { key: 'indice_rot',      label: 'Indice Rot.', render: v => v?.toFixed(3) },
-  { key: 'capacita_stimata', label: 'Cap. Stimata', render: v => v?.toFixed(1) },
-  { key: 'qta_proposta',    label: 'Qta Proposta', render: v => <strong>{v}</strong> },
-  { key: 'motivo',          label: 'Motivo' },
-]
 
 const PRIORITA_COLOR = { Alta: '#dc3545', Media: '#fd7e14', Bassa: '#198754' }
-
-const styles = {
-  back: {
-    background: 'none', border: 'none', color: '#1a3c6e',
-    cursor: 'pointer', fontSize: '0.88rem', marginBottom: '1rem', padding: 0,
-  },
-  header: {
-    background: '#fff', borderRadius: 8, padding: '1.25rem',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: '1.5rem',
-  },
-  h1: { fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.5rem' },
-  meta: { display: 'flex', gap: '2rem', fontSize: '0.88rem', color: '#495057', flexWrap: 'wrap' },
-  metaItem: {},
-  badge: (p) => ({
-    display: 'inline-block', padding: '0.2rem 0.7rem',
-    borderRadius: 10, fontSize: '0.8rem', fontWeight: 700,
-    background: (PRIORITA_COLOR[p] || '#6c757d') + '20',
-    color: PRIORITA_COLOR[p] || '#6c757d',
-  }),
-  hint: { fontSize: '0.83rem', color: '#6c757d' },
-}
 
 export default function DettaglioReferenza() {
   const { codArticolo } = useParams()
   const navigate = useNavigate()
-  const { apiHeaders } = useStore()
-  const [dati, setDati] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [errore, setErrore] = useState(null)
+  const { referenze } = useStore()
 
-  useEffect(() => {
-    setLoading(true)
-    setErrore(null)
-    fetch(`/api/referenze/${encodeURIComponent(codArticolo)}`, { headers: apiHeaders() })
-      .then(r => {
-        if (!r.ok) return r.json().then(d => { throw new Error(d.detail) })
-        return r.json()
-      })
-      .then(setDati)
-      .catch(e => setErrore(e.message))
-      .finally(() => setLoading(false))
-  }, [codArticolo])
+  const dati = referenze.find(r => r.cod_articolo === codArticolo)
 
-  if (loading) return <p style={styles.hint}>Caricamento…</p>
-  if (errore) return <p style={{ color: '#dc3545' }}>{errore}</p>
-  if (!dati) return null
+  if (!dati) {
+    return (
+      <div>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: '#1a3c6e', cursor: 'pointer', fontSize: '0.88rem', marginBottom: '1rem', padding: 0 }}>
+          ← Torna all'elenco
+        </button>
+        <p style={{ color: '#dc3545', fontSize: '0.88rem' }}>
+          Referenza non trovata. <a href="/" style={{ color: '#1a3c6e' }}>Torna alla Dashboard</a> ed elabora prima i dati.
+        </p>
+      </div>
+    )
+  }
+
+  const pColor = PRIORITA_COLOR[dati.priorita] || '#6c757d'
+  const percentAllocata = dati.qta_disponibile > 0
+    ? Math.round((dati.qta_allocata / dati.qta_disponibile) * 100)
+    : 0
 
   return (
     <div>
-      <button style={styles.back} onClick={() => navigate(-1)}>
+      <button
+        style={{ background: 'none', border: 'none', color: '#1a3c6e', cursor: 'pointer', fontSize: '0.88rem', marginBottom: '1rem', padding: 0 }}
+        onClick={() => navigate(-1)}
+      >
         ← Torna all'elenco
       </button>
 
-      <div style={styles.header}>
-        <h1 style={styles.h1}>{dati.descrizione_articolo}</h1>
-        <div style={styles.meta}>
+      {/* Header referenza */}
+      <div style={{ background: '#fff', borderRadius: 8, padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: '1.25rem' }}>
+        <h1 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.65rem', color: '#1a202c' }}>
+          {dati.descrizione_articolo}
+        </h1>
+        <div style={{ display: 'flex', gap: '2rem', fontSize: '0.88rem', color: '#495057', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
           <span><b>Cod. Articolo:</b> {dati.cod_articolo}</span>
-          <span><b>Giorni residui:</b> {dati.giorni_residui}</span>
-          <span><b>Qta disponibile:</b> {dati.qta_disponibile?.toLocaleString('it-IT')}</span>
+          <span><b>Scadenza:</b> {dati.data_scadenza}</span>
+          <span><b>Giorni residui:</b> <span style={{ color: pColor, fontWeight: 700 }}>{dati.giorni_residui}</span></span>
           <span>
             <b>Priorità:</b>{' '}
-            <span style={styles.badge(dati.priorita)}>{dati.priorita}</span>
+            <span style={{ display: 'inline-block', padding: '0.15rem 0.6rem', borderRadius: 10, fontSize: '0.8rem', fontWeight: 700, background: pColor + '22', color: pColor }}>
+              {dati.priorita}
+            </span>
           </span>
+        </div>
+
+        {/* Barra stock */}
+        <div style={{ display: 'flex', gap: '2rem', fontSize: '0.88rem', color: '#495057', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span><b>Qta disponibile:</b> {dati.qta_disponibile?.toLocaleString('it-IT')}</span>
+          <span><b>Qta allocata:</b> <span style={{ color: '#198754', fontWeight: 700 }}>{dati.qta_allocata?.toLocaleString('it-IT')}</span> ({percentAllocata}%)</span>
+          <span><b>Lotti:</b> {dati.lotti?.join(', ')}</span>
+          {dati.sconto_proposto != null && (
+            <span style={{ background: '#fff3cd', color: '#856404', borderRadius: 6, padding: '0.2rem 0.75rem', fontWeight: 700 }}>
+              Sconto suggerito: -{Math.round(dati.sconto_proposto * 100)}%
+              <span style={{ fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.78rem' }}>({dati.qta_disponibile - dati.qta_allocata} unità non allocate)</span>
+            </span>
+          )}
+        </div>
+
+        {/* Progress bar allocazione */}
+        <div style={{ marginTop: '0.85rem', background: '#e9ecef', borderRadius: 4, height: 8 }}>
+          <div style={{
+            width: `${Math.min(percentAllocata, 100)}%`, height: '100%',
+            background: percentAllocata >= 90 ? '#198754' : percentAllocata >= 50 ? '#fd7e14' : '#dc3545',
+            borderRadius: 4, transition: 'width 0.3s',
+          }} />
         </div>
       </div>
 
+      {/* Tabella PDV */}
       <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem', color: '#1a3c6e' }}>
-        Ranking PDV ({dati.pdv.length} assegnat{dati.pdv.length === 1 ? 'o' : 'i'})
+        Ranking PDV ({dati.n_pdv_idonei} assegnat{dati.n_pdv_idonei === 1 ? 'o' : 'i'})
       </h2>
 
       {dati.pdv.length === 0 ? (
-        <p style={styles.hint}>Nessun PDV idoneo per questa referenza.</p>
+        <p style={{ fontSize: '0.83rem', color: '#6c757d' }}>Nessun PDV idoneo per questa referenza.</p>
       ) : (
-        <DataTable columns={PDV_COLUMNS} rows={dati.pdv} />
+        <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                  {['Lotto', 'Cod. PDV', 'Nome PDV', 'Indice Rot.', 'Cap. Stimata', 'Qta Proposta', 'UM', 'Motivo'].map(h => (
+                    <th key={h} style={{ padding: '0.6rem 0.85rem', textAlign: 'left', fontWeight: 600, color: '#495057', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dati.pdv.map((pdv, i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #f0f0f0' }}>
+                    <td style={{ padding: '0.5rem 0.85rem', fontFamily: 'monospace', fontSize: '0.78rem', color: '#6c757d' }}>{pdv.lotto}</td>
+                    <td style={{ padding: '0.5rem 0.85rem', fontFamily: 'monospace', fontSize: '0.78rem' }}>{pdv.cod_pdv}</td>
+                    <td style={{ padding: '0.5rem 0.85rem' }}>{pdv.nome_pdv}</td>
+                    <td style={{ padding: '0.5rem 0.85rem', fontFamily: 'monospace' }}>{pdv.indice_rot?.toFixed(3)}</td>
+                    <td style={{ padding: '0.5rem 0.85rem', fontFamily: 'monospace' }}>{pdv.capacita_stimata?.toFixed(1)}</td>
+                    <td style={{ padding: '0.5rem 0.85rem', fontWeight: 700, color: '#1a3c6e' }}>{pdv.qta_proposta}</td>
+                    <td style={{ padding: '0.5rem 0.85rem', fontSize: '0.78rem', color: '#6c757d' }}>{pdv.um}</td>
+                    <td style={{ padding: '0.5rem 0.85rem', fontSize: '0.78rem', color: '#495057' }}>{pdv.motivo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   )

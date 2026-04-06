@@ -178,7 +178,7 @@ export default function Dashboard() {
       if (!res.ok) {
         setLocalError(data.detail || "Errore durante l'elaborazione")
       } else {
-        setRisultato({ summary: data.summary, allocazioni: data.allocazioni, avvisi: data.avvisi })
+        setRisultato({ summary: data.summary, allocazioni: data.allocazioni, avvisi: data.avvisi, referenze: data.referenze ?? [] })
       }
     } catch (err) {
       setLocalError('Errore di rete: ' + err.message)

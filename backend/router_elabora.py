@@ -16,6 +16,8 @@ from .models import (
     ElaboraResponse,
     SummaryStats,
     AllocazioneRow,
+    PDVAssignment,
+    ReferenzaCompletaRow,
     ElencoReferenzeResponse,
     ReferenzaRow,
     DettaglioReferenzaResponse,
@@ -101,10 +103,77 @@ def elabora(
         for _, row in risultato["allocazioni"].iterrows()
     ]
 
+    # ── Costruisce referenze per articolo (frontend-friendly, elimina dipendenza sessione) ──
+    oggi = date.today()
+    qta_col = "QTA_DISPONIBILE_COLLI" if body.modalita == "ceduto" else "QTA_DISPONIBILE_PEZZI"
+
+    ref_map: dict[str, dict] = {}
+    for _, crow in sess.cedi.iterrows():
+        cod = str(crow["COD_ARTICOLO"])
+        scadenza = crow["DATA_SCADENZA"].date()
+        giorni = (scadenza - oggi).days
+        if cod not in ref_map:
+            ref_map[cod] = {
+                "cod_articolo": cod,
+                "descrizione_articolo": str(crow["DESCRIZIONE_ARTICOLO"]),
+                "data_scadenza": scadenza.isoformat(),
+                "giorni_residui": giorni,
+                "qta_disponibile": 0.0,
+                "lotti": [],
+                "sconto_proposto": None,
+                "pdv": [],
+            }
+        ref_map[cod]["qta_disponibile"] += float(crow[qta_col])
+        ref_map[cod]["lotti"].append(str(crow["LOTTO"]))
+        # Tiene il lotto con scadenza più urgente
+        if giorni < ref_map[cod]["giorni_residui"]:
+            ref_map[cod]["giorni_residui"] = giorni
+            ref_map[cod]["data_scadenza"] = scadenza.isoformat()
+
+    for alloc in allocazioni:
+        cod = alloc.cod_articolo
+        if cod not in ref_map:
+            continue
+        ref_map[cod]["pdv"].append(PDVAssignment(
+            lotto=alloc.lotto,
+            cod_pdv=alloc.cod_pdv,
+            nome_pdv=alloc.nome_pdv,
+            qta_proposta=alloc.qta_proposta,
+            um=alloc.um,
+            indice_rot=alloc.indice_rot,
+            capacita_stimata=alloc.capacita_stimata,
+            motivo=alloc.motivo,
+            sconto_proposto=alloc.sconto_proposto,
+        ))
+        if alloc.sconto_proposto is not None:
+            curr = ref_map[cod]["sconto_proposto"]
+            if curr is None or alloc.sconto_proposto > curr:
+                ref_map[cod]["sconto_proposto"] = alloc.sconto_proposto
+
+    referenze_complete = []
+    for data in ref_map.values():
+        giorni = data["giorni_residui"]
+        qta_allocata = float(sum(p.qta_proposta for p in data["pdv"]))
+        referenze_complete.append(ReferenzaCompletaRow(
+            cod_articolo=data["cod_articolo"],
+            descrizione_articolo=data["descrizione_articolo"],
+            data_scadenza=data["data_scadenza"],
+            giorni_residui=giorni,
+            qta_disponibile=data["qta_disponibile"],
+            qta_allocata=qta_allocata,
+            n_pdv_idonei=len({p.cod_pdv for p in data["pdv"]}),
+            priorita=assegna_priorita(giorni),
+            sconto_proposto=data["sconto_proposto"],
+            lotti=data["lotti"],
+            pdv=data["pdv"],
+        ))
+    referenze_complete.sort(key=lambda r: r.giorni_residui)
+
     return ElaboraResponse(
         summary=SummaryStats(**s),
         allocazioni=allocazioni,
         avvisi=risultato["avvisi"],
+        referenze=referenze_complete,
     )
 
 

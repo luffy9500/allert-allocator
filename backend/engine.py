@@ -8,6 +8,7 @@ Supporta due modalità:
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from datetime import date
 from typing import Literal
 
@@ -418,6 +419,9 @@ def elabora_riallocazione(
         rotazione_df = calcola_indice_venduto(rotazione_df)
         coeff = COEFF_VENDUTO
 
+    # ── Ordina lotti per urgenza (scadenza più vicina prima) ──────────────────
+    cedi_df = cedi_df.sort_values("DATA_SCADENZA", ascending=True).reset_index(drop=True)
+
     # ── Pre-calcola la media INDICE_ROT per PDV (fallback referenze senza storico) ──
     media_per_pdv = (
         rotazione_df.groupby(["COD_PDV", "NOME_PDV"])["INDICE_ROT"]
@@ -427,6 +431,10 @@ def elabora_riallocazione(
 
     righe_output: list[dict] = []
     avvisi: list[str] = []
+
+    # Traccia la capacità già usata per ogni (articolo, PDV) — evita over-assignment
+    # su più lotti dello stesso articolo verso lo stesso PDV
+    pdv_capacita_usata: dict[str, dict[str, float]] = defaultdict(dict)
 
     for _, lotto_row in cedi_df.iterrows():
         lotto = lotto_row["LOTTO"]
@@ -461,6 +469,16 @@ def elabora_riallocazione(
         # Calcola capacità stimata
         pdv_articolo = calcola_capacita(pdv_articolo, giorni_residui, coeff)
 
+        # Sottrai la capacità già usata da lotti precedenti dello stesso articolo
+        gia_usata = pdv_capacita_usata[cod_articolo]
+        if gia_usata:
+            for idx in pdv_articolo.index:
+                cod_pdv = str(pdv_articolo.at[idx, "COD_PDV"])
+                used = gia_usata.get(cod_pdv, 0.0)
+                pdv_articolo.at[idx, "CAPACITA_STIMATA"] = max(
+                    0.0, pdv_articolo.at[idx, "CAPACITA_STIMATA"] - used
+                )
+
         # Applica filtri PDV
         pdv_articolo = filtra_pdv(pdv_articolo, anagrafica_df)
 
@@ -470,6 +488,13 @@ def elabora_riallocazione(
 
         # Alloca la quantità disponibile
         allocazioni, qta_non_allocata = alloca_quantita(qta_disponibile, pdv_articolo, giorni_residui)
+
+        # Aggiorna il tracking: registra quanto assegnato a ogni PDV per questo articolo
+        for _, arow in allocazioni.iterrows():
+            cod_pdv_str = str(arow["COD_PDV"])
+            pdv_capacita_usata[cod_articolo][cod_pdv_str] = (
+                pdv_capacita_usata[cod_articolo].get(cod_pdv_str, 0.0) + float(arow["QTA_PROPOSTA"])
+            )
 
         if qta_non_allocata > 0:
             avvisi.append(
