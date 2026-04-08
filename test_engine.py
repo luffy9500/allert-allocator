@@ -540,6 +540,27 @@ class TestUnisciCeduto:
         p2 = merged[merged["COD_PDV"] == "P2"]
         assert p2["QTA_CEDUTA_14GG_COLLI"].iloc[0] == 0.0  # left-join → 0
 
+    def test_articolo_solo_in_60gg_incluso(self):
+        """Un articolo presente solo nel 60gg (e non nel 7gg) deve comparire nel merge."""
+        df7 = prepara_ceduto_7gg(pd.DataFrame([
+            {"COD_PDV": "P1", "NOME_PDV": "A", "COD_ARTICOLO": "ART_COMUNE",
+             "QTA_CEDUTA_7GG_COLLI": 7, "QTA_CEDUTA_7GG_PEZZI": 42},
+        ]))
+        df60 = prepara_ceduto_60gg(pd.DataFrame([
+            {"COD_PDV": "P1", "NOME_PDV": "A", "COD_ARTICOLO": "ART_COMUNE",
+             "QTA_CEDUTA_60GG_COLLI": 60, "QTA_CEDUTA_60GG_PEZZI": 360},
+            {"COD_PDV": "P2", "NOME_PDV": "B", "COD_ARTICOLO": "ART_SOLO_60",
+             "QTA_CEDUTA_60GG_COLLI": 50, "QTA_CEDUTA_60GG_PEZZI": 300},
+        ]))
+        merged = unisci_ceduto(df7, None, None, df60)
+        # ART_SOLO_60 non è nel 7gg ma deve essere presente nel merge
+        art_solo = merged[merged["COD_ARTICOLO"] == "ART_SOLO_60"]
+        assert len(art_solo) == 1, "ART_SOLO_60 deve essere nel merge anche se assente dal 7gg"
+        assert art_solo["QTA_CEDUTA_7GG_COLLI"].iloc[0] == 0.0
+        assert art_solo["QTA_CEDUTA_60GG_COLLI"].iloc[0] == 50
+        # Totale: ART_COMUNE (P1) + ART_SOLO_60 (P2)
+        assert len(merged) == 2
+
 
 # ---------------------------------------------------------------------------
 # Integrazione: elabora_riallocazione

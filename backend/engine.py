@@ -308,13 +308,20 @@ def unisci_ceduto(
     - df_7  è obbligatorio
     - df_14, df_30, df_60 sono opzionali; se assenti le rispettive QTA valgono 0
 
+    Usa l'unione di tutti i periodi come base: un articolo presente solo in 60gg
+    (ma non in 7gg) compare comunque nel risultato con QTA 7/14/30 = 0.
+
     In elabora_riallocazione() le colonne _COLLI o _PEZZI vengono selezionate
     in base alla modalità prima di calcolare l'indice di rotazione.
     """
     _CHIAVI = ["COD_PDV", "NOME_PDV", "COD_ARTICOLO"]
-    df = df_7.copy()
+    tutti = [("7", df_7), ("14", df_14), ("30", df_30), ("60", df_60)]
 
-    for n, df_n in [("14", df_14), ("30", df_30), ("60", df_60)]:
+    # Raccogli tutte le chiavi univoche da tutti i periodi disponibili
+    chiavi_frames = [df_n[_CHIAVI] for _, df_n in tutti if df_n is not None and not df_n.empty]
+    df = pd.concat(chiavi_frames, ignore_index=True).drop_duplicates().reset_index(drop=True)
+
+    for n, df_n in tutti:
         colli_col = f"QTA_CEDUTA_{n}GG_COLLI"
         pezzi_col = f"QTA_CEDUTA_{n}GG_PEZZI"
         if df_n is not None and not df_n.empty:
