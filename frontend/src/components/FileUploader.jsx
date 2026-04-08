@@ -137,24 +137,36 @@ export default function FileUploader({ tipo, label, obbligatorio = false, infoTi
         setMsg('Elaborazione righe…')
         const righe = await elaboraCedutoClientSide(file, periodo)
 
-        setMsg('Invio dati…')
-        const res = await fetch(`/api/upload/json/${tipo}`, {
-          method: 'POST',
-          headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ righe }),
-        })
-        const text = await res.text()
-        let data
-        try { data = JSON.parse(text) } catch (_) { data = { detail: text } }
-
-        if (!res.ok) {
-          setStato('errore')
-          setMsg(data.detail || 'Errore sconosciuto')
-        } else {
-          setStato('ok')
-          setMsg(`${data.righe} righe elaborate`)
-          markFileCaricato(tipo)
+        // Invia a chunk da 2000 righe per rispettare il limite 4.5 MB Vercel
+        const CHUNK_SIZE = 2000
+        const chunks = []
+        for (let i = 0; i < righe.length; i += CHUNK_SIZE) {
+          chunks.push(righe.slice(i, i + CHUNK_SIZE))
         }
+
+        let lastData = null
+        for (let i = 0; i < chunks.length; i++) {
+          const isLast = i === chunks.length - 1
+          setMsg(`Invio dati… (${i + 1}/${chunks.length})`)
+          const res = await fetch(`/api/upload/json/${tipo}`, {
+            method: 'POST',
+            headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ righe: chunks[i], is_last_chunk: isLast }),
+          })
+          const text = await res.text()
+          let data
+          try { data = JSON.parse(text) } catch (_) { data = { detail: text } }
+          if (!res.ok) {
+            setStato('errore')
+            setMsg(data.detail || 'Errore sconosciuto')
+            return
+          }
+          if (isLast) lastData = data
+        }
+
+        setStato('ok')
+        setMsg(`${lastData?.righe ?? righe.length} righe elaborate`)
+        markFileCaricato(tipo)
       } else {
         // ── Upload multipart standard (file piccoli) ──────────────────────────
         const formData = new FormData()

@@ -28,6 +28,8 @@ class SessionData:
     risultato_df: Optional[pd.DataFrame] = None
     risultato_summary: Optional[dict] = None
     risultato_avvisi: list[str] = field(default_factory=list)
+    # Buffer temporaneo per upload a chunk: { tipo_file: [rows...] }
+    _chunk_buffers: dict = field(default_factory=dict)
 
 
 # Registro globale delle sessioni: { session_id: SessionData }

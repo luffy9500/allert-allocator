@@ -111,17 +111,27 @@ async def upload_file(
     )
 
 
-@router.post("/json/{tipo_file}", response_model=UploadResponse)
+class ChunkUploadResponse(UploadResponse):
+    chunk_received: bool = False
+    chunks_buffered: int = 0
+
+
+@router.post("/json/{tipo_file}")
 async def upload_json_data(
     tipo_file: str,
     request: Request,
     x_session_id: str = Header(..., alias="X-Session-ID"),
-) -> UploadResponse:
+):
     """
     Carica dati ceduto pre-elaborati client-side come JSON.
-    Body: { "righe": [{"COD_PDV": "...", "COD_ARTICOLO": "...", ...}, ...] }
 
-    Usato dal frontend per file grandi che superano il limite di upload Vercel (4.5 MB).
+    Body: {
+      "righe": [...],
+      "is_last_chunk": true   # opzionale, default true (upload singolo)
+    }
+
+    Per file grandi il frontend invia N chunk con is_last_chunk=false e poi
+    l'ultimo con is_last_chunk=true, che trigghera l'elaborazione.
     """
     if tipo_file not in _TIPO_CONFIG:
         raise HTTPException(
@@ -131,11 +141,35 @@ async def upload_json_data(
 
     body = await request.json()
     righe = body.get("righe", [])
+    is_last_chunk = body.get("is_last_chunk", True)
 
-    if not righe:
+    if not righe and is_last_chunk:
         raise HTTPException(status_code=422, detail="Payload vuoto: nessuna riga ricevuta.")
 
-    df = pd.DataFrame(righe)
+    session = session_store.get_or_create(x_session_id)
+
+    # Accumula nel buffer della sessione
+    if tipo_file not in session._chunk_buffers:
+        session._chunk_buffers[tipo_file] = []
+    session._chunk_buffers[tipo_file].extend(righe)
+
+    if not is_last_chunk:
+        # Chunk intermedio: conferma ricezione senza elaborare
+        return {
+            "tipo": tipo_file,
+            "righe": 0,
+            "colonne": [],
+            "messaggio": f"Chunk ricevuto ({len(session._chunk_buffers[tipo_file])} righe in buffer).",
+            "chunk_received": True,
+            "chunks_buffered": len(session._chunk_buffers[tipo_file]),
+        }
+
+    # Ultimo chunk: elabora tutto il buffer
+    tutte_le_righe = session._chunk_buffers.pop(tipo_file, [])
+    if not tutte_le_righe:
+        raise HTTPException(status_code=422, detail="Buffer vuoto: nessuna riga ricevuta.")
+
+    df = pd.DataFrame(tutte_le_righe)
     prepara_fn, attr_name = _TIPO_CONFIG[tipo_file]
 
     try:
@@ -143,7 +177,6 @@ async def upload_json_data(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    session = session_store.get_or_create(x_session_id)
     setattr(session, attr_name, df_clean)
 
     return UploadResponse(
