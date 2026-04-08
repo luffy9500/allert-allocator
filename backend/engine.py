@@ -7,7 +7,9 @@ Supporta due modalità:
 
 from __future__ import annotations
 
+import io
 import math
+import re
 from collections import defaultdict
 from datetime import date
 from typing import Literal
@@ -31,6 +33,164 @@ MAX_PDV_CRITICO = 3              # usato quando GIORNI_RESIDUI <= GIORNI_CRITICI
 GIORNI_CRITICI = 2
 SOGLIA_PRIORITA_ALTA = 5
 SOGLIA_PRIORITA_MEDIA = 15
+
+
+# ---------------------------------------------------------------------------
+# Trasformazione file ceduto dal formato grezzo (colonne posizionali)
+# ---------------------------------------------------------------------------
+
+def rileva_periodo_ceduto(filename: str) -> str:
+    """Rileva il periodo (7GG, 14GG, 30GG, 60GG) dal nome del file.
+
+    Esempi:
+        CEDUTO_MAG_20_7_GG.XLS  → "7GG"
+        CEDUTO 14GG.XLS         → "14GG"
+        file_senza_periodo.xls  → "7GG"  (default)
+    """
+    match = re.search(r'(\d+)\s*[-_]?\s*GG', filename, re.IGNORECASE)
+    if match:
+        try:
+            n = int(match.group(1))
+            if n in (7, 14, 30, 60):
+                return f"{n}GG"
+        except ValueError:
+            pass
+    return "7GG"
+
+
+def trasforma_ceduto_raw(content: bytes, periodo: str) -> pd.DataFrame:
+    """Legge un file ceduto dal formato grezzo (multi-foglio, colonne posizionali)
+    e lo restituisce come DataFrame con le colonne standard attese da prepara_ceduto_Xgg.
+
+    Layout colonne (indice 0-based, dopo aver saltato la riga header):
+        col  9 → Radice articolo
+        col 10 → Variante articolo
+        col 12 → Tipo movimento  (tieni solo "L")
+        col 14 → Pezzi
+        col 15 → Imballo (0 o vuoto → usa 1)
+        col 17 → Codice PDV
+        col 18 → Nome PDV
+
+    Trasformazioni:
+        COD_ARTICOLO  = str(int(radice)) + str(int(variante)).zfill(2)
+        QTA_COLLI     = round(pezzi / imballo)
+        COD_PDV       = se 6 cifre e termina con "0" → rimuovi l'ultimo "0"
+    """
+    # ── Leggi tutti i fogli, senza interpretare header ───────────────────────
+    try:
+        all_sheets: dict[str, pd.DataFrame] = pd.read_excel(
+            io.BytesIO(content),
+            header=None,
+            sheet_name=None,
+            dtype=object,
+        )
+    except Exception as exc:
+        raise ValueError(f"Impossibile leggere il file Excel: {exc}") from exc
+
+    if not all_sheets:
+        raise ValueError("File vuoto: nessun foglio trovato.")
+
+    # ── Concatena i fogli saltando la riga 0 (header) di ognuno ──────────────
+    frames: list[pd.DataFrame] = []
+    for df_sheet in all_sheets.values():
+        if df_sheet.empty:
+            continue
+        frames.append(df_sheet.iloc[1:].copy())
+
+    if not frames:
+        raise ValueError("Nessun dato dopo aver saltato le intestazioni.")
+
+    df = pd.concat(frames, ignore_index=True)
+
+    if df.shape[1] <= 18:
+        raise ValueError(
+            f"Il file ha solo {df.shape[1]} colonne; "
+            "il formato grezzo ne richiede almeno 19 (indici 0–18)."
+        )
+
+    # ── Helper interni ────────────────────────────────────────────────────────
+    def _to_int_str(val: object) -> str:
+        """Converte un valore a stringa intera (30264.0 → '30264')."""
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            return ""
+        try:
+            return str(int(float(str(val).strip())))
+        except (ValueError, TypeError):
+            return str(val).strip()
+
+    def _is_numeric(val: object) -> bool:
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            return False
+        try:
+            float(str(val).strip())
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    # ── Step 2: Filtro righe valide ───────────────────────────────────────────
+    # Scarta righe con col 9 non numerica (header ripetuti, totali, righe vuote)
+    mask_radice = df.iloc[:, 9].apply(_is_numeric)
+    df = df[mask_radice].copy()
+
+    if df.empty:
+        raise ValueError(
+            "Nessuna riga valida: colonna 9 (Radice) sempre vuota o non numerica. "
+            "Verificare che il file sia nel formato grezzo corretto."
+        )
+
+    # Tieni solo le righe con tipo movimento = "L" (colonna 12)
+    col12 = df.iloc[:, 12].astype(str).str.strip().str.upper()
+    df = df[col12 == "L"].copy()
+
+    if df.empty:
+        raise ValueError(
+            "Nessuna riga con tipo movimento = 'L' (colonna 12). "
+            "Verificare il formato del file."
+        )
+
+    # ── Step 3: Trasformazioni ────────────────────────────────────────────────
+    pezzi   = pd.to_numeric(df.iloc[:, 14], errors="coerce").fillna(0)
+    imballo = pd.to_numeric(df.iloc[:, 15], errors="coerce").fillna(0)
+    imballo = imballo.replace(0, 1)  # imballo=0 o vuoto → usa 1
+
+    colli = (pezzi / imballo).round().astype(int)
+
+    # Scarta valori negativi
+    mask_pos = (pezzi >= 0) & (colli >= 0)
+
+    # COD_ARTICOLO = radice + variante (zero-pad a 2 cifre)
+    radice   = df.iloc[:, 9].apply(_to_int_str)
+    variante = df.iloc[:, 10].apply(lambda v: _to_int_str(v).zfill(2) if _to_int_str(v) else "00")
+    cod_articolo = radice + variante
+
+    # COD_PDV: 6 cifre che terminano con "0" → rimuovi lo zero finale
+    def _normalizza_pdv(val: object) -> str:
+        s = _to_int_str(val)
+        if len(s) == 6 and s.endswith("0"):
+            return s[:-1]
+        return s
+
+    cod_pdv  = df.iloc[:, 17].apply(_normalizza_pdv)
+    nome_pdv = df.iloc[:, 18].astype(str).str.strip()
+
+    # ── Step 4: Costruzione output ────────────────────────────────────────────
+    col_colli = f"QTA_CEDUTA_{periodo}_COLLI"
+    col_pezzi = f"QTA_CEDUTA_{periodo}_PEZZI"
+
+    result = pd.DataFrame({
+        "COD_PDV":      cod_pdv,
+        "NOME_PDV":     nome_pdv,
+        "COD_ARTICOLO": cod_articolo,
+        col_colli:      colli,
+        col_pezzi:      pezzi.round().astype(int),
+    })
+
+    result = result[mask_pos.values].reset_index(drop=True)
+
+    if result.empty:
+        raise ValueError("Nessuna riga valida dopo i filtri (pezzi e colli devono essere ≥ 0).")
+
+    return result
 
 
 # ---------------------------------------------------------------------------

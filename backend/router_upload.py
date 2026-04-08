@@ -21,6 +21,7 @@ from .engine import (
     prepara_ceduto_60gg,
     prepara_vendite_pdv,
     prepara_anagrafica,
+    trasforma_ceduto_raw,
 )
 from .models import UploadResponse
 
@@ -37,6 +38,14 @@ _TIPO_CONFIG = {
     "anagrafica_pdv": (prepara_anagrafica,  "anagrafica"),
 }
 
+# Periodo corrispondente a ogni tipo ceduto (per la trasformazione raw)
+_CEDUTO_PERIODI = {
+    "ceduto_7gg":  "7GG",
+    "ceduto_14gg": "14GG",
+    "ceduto_30gg": "30GG",
+    "ceduto_60gg": "60GG",
+}
+
 
 @router.post("/{tipo_file}", response_model=UploadResponse)
 async def upload_file(
@@ -47,7 +56,9 @@ async def upload_file(
     """
     Carica un file Excel per la sessione corrente.
 
-    tipo_file: cedi_scadenze | ceduto_cedi | vendite_pdv | anagrafica_pdv
+    Per i file ceduto accetta sia il formato standard (colonne nominate)
+    sia il formato grezzo (colonne posizionali, multi-foglio).
+    Il formato grezzo viene rilevato automaticamente e trasformato.
     """
     if tipo_file not in _TIPO_CONFIG:
         raise HTTPException(
@@ -56,19 +67,37 @@ async def upload_file(
                    f"Valori ammessi: {sorted(_TIPO_CONFIG)}",
         )
 
-    # Leggi il file Excel in memoria
     content = await file.read()
-    try:
-        df_raw = pd.read_excel(io.BytesIO(content))
-    except Exception as exc:
-        raise HTTPException(status_code=422, detail=f"Impossibile leggere il file Excel: {exc}")
-
-    # Valida e normalizza secondo il tipo
     prepara_fn, attr_name = _TIPO_CONFIG[tipo_file]
-    try:
-        df_clean = prepara_fn(df_raw)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+
+    if tipo_file in _CEDUTO_PERIODI:
+        # ── File ceduto: prova prima il formato standard, poi il grezzo ──────
+        periodo = _CEDUTO_PERIODI[tipo_file]
+        try:
+            df_raw = pd.read_excel(io.BytesIO(content))
+            df_clean = prepara_fn(df_raw)
+        except (ValueError, KeyError):
+            # Formato standard non riconosciuto → prova trasformazione raw
+            try:
+                df_trasformato = trasforma_ceduto_raw(content, periodo)
+                df_clean = prepara_fn(df_trasformato)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Formato non riconosciuto ({periodo}): {exc}",
+                )
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Impossibile leggere il file Excel: {exc}")
+    else:
+        # ── Altri file: flusso standard ───────────────────────────────────────
+        try:
+            df_raw = pd.read_excel(io.BytesIO(content))
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Impossibile leggere il file Excel: {exc}")
+        try:
+            df_clean = prepara_fn(df_raw)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
 
     # Salva nella sessione
     session = session_store.get_or_create(x_session_id)

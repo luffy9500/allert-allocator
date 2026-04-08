@@ -3,6 +3,8 @@ Test per backend/engine.py.
 Copre entrambe le modalità (ceduto / venduto), filtri PDV, casi critici e summary.
 """
 
+import io
+
 import pytest
 import pandas as pd
 from datetime import date, timedelta
@@ -25,6 +27,8 @@ from backend.engine import (
     alloca_quantita,
     unisci_ceduto,
     elabora_riallocazione,
+    trasforma_ceduto_raw,
+    rileva_periodo_ceduto,
     COEFF_CEDUTO,
     COEFF_VENDUTO,
     SOGLIA_INDICE_MIN,
@@ -148,6 +152,139 @@ class TestValidazione:
         df = pd.DataFrame([{"COD_PDV": "P1", "ATTIVO": "no"}])
         result = prepara_anagrafica(df)
         assert result["ATTIVO"].iloc[0] == False
+
+
+# ---------------------------------------------------------------------------
+# Trasformazione file ceduto raw
+# ---------------------------------------------------------------------------
+
+def _make_raw_ceduto_bytes(data_rows: list[list], n_cols: int = 20) -> bytes:
+    """Crea bytes Excel con 1 riga header + data_rows nel formato grezzo."""
+    header = [f"H{i}" for i in range(n_cols)]
+    all_rows = [header] + data_rows
+    df = pd.DataFrame(all_rows)
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, header=False)
+    return buf.getvalue()
+
+
+def _raw_row(radice=30264, variante=1, tipo="L", pezzi=70, imballo=7, cod_pdv=20873, nome="SUPER MKT"):
+    """Crea una riga raw con i valori nelle colonne corrette."""
+    row = [""] * 20
+    row[9]  = radice
+    row[10] = variante
+    row[12] = tipo
+    row[14] = pezzi
+    row[15] = imballo
+    row[17] = cod_pdv
+    row[18] = nome
+    return row
+
+
+class TestTrasformaCedutoRaw:
+
+    def test_trasformazione_base(self):
+        content = _make_raw_ceduto_bytes([_raw_row()])
+        df = trasforma_ceduto_raw(content, "7GG")
+        assert "COD_ARTICOLO" in df.columns
+        assert "QTA_CEDUTA_7GG_COLLI" in df.columns
+        assert "QTA_CEDUTA_7GG_PEZZI" in df.columns
+        assert df.iloc[0]["COD_ARTICOLO"] == "3026401"   # 30264 + "01"
+        assert df.iloc[0]["QTA_CEDUTA_7GG_COLLI"] == 10  # round(70/7)
+        assert df.iloc[0]["QTA_CEDUTA_7GG_PEZZI"] == 70
+
+    def test_periodo_nei_nomi_colonne(self):
+        content = _make_raw_ceduto_bytes([_raw_row()])
+        df14 = trasforma_ceduto_raw(content, "14GG")
+        assert "QTA_CEDUTA_14GG_COLLI" in df14.columns
+
+    def test_filtra_tipo_movimento_non_L(self):
+        rows = [_raw_row(tipo="L"), _raw_row(tipo="O"), _raw_row(tipo="X")]
+        content = _make_raw_ceduto_bytes(rows)
+        df = trasforma_ceduto_raw(content, "7GG")
+        assert len(df) == 1  # solo la riga L
+
+    def test_filtra_header_ripetuto_col9_non_numerico(self):
+        rows = [
+            _raw_row(radice=30264),
+            _raw_row(radice="Radice"),   # header ripetuto → da scartare
+        ]
+        content = _make_raw_ceduto_bytes(rows)
+        df = trasforma_ceduto_raw(content, "7GG")
+        assert len(df) == 1
+
+    def test_normalizza_pdv_6_cifre_con_zero(self):
+        row = _raw_row(cod_pdv=208750)   # 6 cifre, finisce con 0 → 20875
+        content = _make_raw_ceduto_bytes([row])
+        df = trasforma_ceduto_raw(content, "7GG")
+        assert df.iloc[0]["COD_PDV"] == "20875"
+
+    def test_pdv_5_cifre_invariato(self):
+        row = _raw_row(cod_pdv=20873)
+        content = _make_raw_ceduto_bytes([row])
+        df = trasforma_ceduto_raw(content, "7GG")
+        assert df.iloc[0]["COD_PDV"] == "20873"
+
+    def test_imballo_zero_usa_uno(self):
+        row = _raw_row(pezzi=50, imballo=0)   # imballo=0 → usa 1 → colli=50
+        content = _make_raw_ceduto_bytes([row])
+        df = trasforma_ceduto_raw(content, "7GG")
+        assert df.iloc[0]["QTA_CEDUTA_7GG_COLLI"] == 50
+
+    def test_filtra_pezzi_negativi(self):
+        rows = [_raw_row(pezzi=70), _raw_row(pezzi=-10)]
+        content = _make_raw_ceduto_bytes(rows)
+        df = trasforma_ceduto_raw(content, "7GG")
+        assert len(df) == 1
+
+    def test_variante_zero_pad(self):
+        row = _raw_row(radice=30264, variante=5)  # variante "5" → "05"
+        content = _make_raw_ceduto_bytes([row])
+        df = trasforma_ceduto_raw(content, "7GG")
+        assert df.iloc[0]["COD_ARTICOLO"] == "3026405"
+
+    def test_multifoglio(self):
+        row1 = _raw_row(radice=11111, variante=1)
+        row2 = _raw_row(radice=22222, variante=2)
+        # Crea Excel con 2 fogli
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            pd.DataFrame([["H"] * 20, row1]).to_excel(writer, sheet_name="Fog1", index=False, header=False)
+            pd.DataFrame([["H"] * 20, row2]).to_excel(writer, sheet_name="Fog2", index=False, header=False)
+        content = buf.getvalue()
+        df = trasforma_ceduto_raw(content, "7GG")
+        articoli = set(df["COD_ARTICOLO"])
+        assert "1111101" in articoli
+        assert "2222202" in articoli
+
+    def test_compatibile_con_prepara_ceduto_7gg(self):
+        """Il DataFrame prodotto deve superare prepara_ceduto_7gg."""
+        content = _make_raw_ceduto_bytes([_raw_row()])
+        df_raw = trasforma_ceduto_raw(content, "7GG")
+        df_ok = prepara_ceduto_7gg(df_raw)   # non deve sollevare ValueError
+        assert len(df_ok) == 1
+
+
+class TestRilevaPeriodoCeduto:
+
+    def test_7gg_con_underscore(self):
+        assert rileva_periodo_ceduto("CEDUTO_MAG_7_GG.XLS") == "7GG"
+
+    def test_14gg_senza_separatore(self):
+        assert rileva_periodo_ceduto("CEDUTO14GG.xlsx") == "14GG"
+
+    def test_30gg_con_spazio(self):
+        assert rileva_periodo_ceduto("ceduto 30 GG.xls") == "30GG"
+
+    def test_60gg_case_insensitive(self):
+        assert rileva_periodo_ceduto("file_60gg_export.xlsx") == "60GG"
+
+    def test_default_senza_periodo(self):
+        assert rileva_periodo_ceduto("file_senza_periodo.xls") == "7GG"
+
+    def test_ignora_numeri_non_validi(self):
+        assert rileva_periodo_ceduto("CEDUTO_45GG.xlsx") == "7GG"  # 45 non è valido
 
 
 # ---------------------------------------------------------------------------
