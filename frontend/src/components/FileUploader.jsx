@@ -1,13 +1,12 @@
 /**
  * Componente upload file Excel.
  *
- * Per i file ceduto (tipo ceduto_*):
+ * Per TUTTI i tipi di file:
  *   - legge il file nel browser con SheetJS
- *   - applica la trasformazione (colonne posizionali → colonne nominate)
- *   - invia solo i dati estratti come JSON → bypassa il limite 4.5 MB di Vercel
- *
- * Per tutti gli altri tipi:
- *   - upload multipart standard
+ *   - per file ceduto applica la trasformazione posizionale (multi-foglio)
+ *   - per gli altri file legge le colonne nominate dal foglio 1
+ *   - invia i dati come JSON a chunk da 2000 righe
+ *     → bypassa il limite 4.5 MB di Vercel
  */
 
 import React, { useRef, useState } from 'react'
@@ -22,18 +21,18 @@ const CEDUTO_PERIODI = {
   ceduto_60gg: '60GG',
 }
 
-/**
- * Legge un file ceduto grezzo con SheetJS (client-side) e restituisce
- * un array di righe con le colonne standard.
- * Replica la logica di trasforma_ceduto_raw nel backend.
- */
+const CHUNK_SIZE = 2000
+
+// ---------------------------------------------------------------------------
+// Lettura file ceduto grezzo (colonne posizionali, multi-foglio)
+// ---------------------------------------------------------------------------
 async function elaboraCedutoClientSide(file, periodo) {
   const XLSX = await import('xlsx')
 
   const arrayBuffer = await file.arrayBuffer()
   const workbook = XLSX.read(arrayBuffer, {
     type: 'array',
-    raw: true,        // non interpretare date/formati
+    raw: true,
     cellNF: false,
     cellText: false,
   })
@@ -42,7 +41,6 @@ async function elaboraCedutoClientSide(file, periodo) {
 
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName]
-    // Ottieni come array di array, raw=true per evitare conversioni automatiche
     const data = XLSX.utils.sheet_to_json(sheet, {
       header: 1,
       raw: true,
@@ -55,43 +53,35 @@ async function elaboraCedutoClientSide(file, periodo) {
       const row = data[i]
       if (!row || row.length <= 18) continue
 
-        // Indici 0-based (colonne 1-based del documento → -1):
+      // Indici 0-based (colonne 1-based del documento → -1):
       // col9(1b)→idx8=Radice, col10(1b)→idx9=Variante, col12(1b)→idx11=TipoMov
       // col14(1b)→idx13=Pezzi, col15(1b)→idx14=Imballo
       // col17(1b)→idx16=CodPDV, col18(1b)→idx17=NomePDV
 
-      // Col 9 (1-based) = idx 8 = Radice — deve essere numerica
       const radiceRaw = row[8]
       if (radiceRaw === '' || radiceRaw === null || radiceRaw === undefined) continue
       if (isNaN(Number(radiceRaw))) continue
 
-      // Col 12 (1-based) = idx 11 = TipoMov — deve essere "L"
       const tipoMov = String(row[11] ?? '').trim().toUpperCase()
       if (tipoMov !== 'L') continue
 
-      // Col 14 (1-based) = idx 13 = Pezzi
-      // Col 15 (1-based) = idx 14 = Imballo
       const pezzi   = Math.round(Number(row[13]) || 0)
       const imballo = Number(row[14]) || 0
       const imballoEff = imballo <= 0 ? 1 : imballo
       const colli   = Math.round(pezzi / imballoEff)
 
-      // Scarta valori negativi
       if (pezzi < 0 || colli < 0) continue
 
-      // COD_ARTICOLO: idx 8 (Radice) + idx 9 (Variante) zero-padded a 2 cifre
       const radiceStr   = String(Math.round(Number(radiceRaw)))
       const variante    = Number(row[9]) || 0
       const varianteStr = String(Math.round(variante)).padStart(2, '0')
       const codArticolo = radiceStr + varianteStr
 
-      // COD_PDV: idx 16 — 6 cifre con "0" finale → rimuovi l'ultimo zero
       let codPdv = String(Math.round(Number(row[16]) || 0))
       if (codPdv.length === 6 && codPdv.endsWith('0')) {
         codPdv = codPdv.slice(0, -1)
       }
 
-      // NomePDV: idx 17
       const nomePdv = String(row[17] ?? '').trim()
 
       righe.push({
@@ -114,6 +104,74 @@ async function elaboraCedutoClientSide(file, periodo) {
   return righe
 }
 
+// ---------------------------------------------------------------------------
+// Lettura file generico con colonne nominate (primo foglio)
+// Date → stringa ISO YYYY-MM-DD
+// ---------------------------------------------------------------------------
+async function leggiExcelGenerico(file) {
+  const XLSX = await import('xlsx')
+
+  const arrayBuffer = await file.arrayBuffer()
+  const workbook = XLSX.read(arrayBuffer, {
+    type: 'array',
+    cellDates: true,   // date come oggetti JS Date
+    cellNF: false,
+    cellText: false,
+  })
+
+  const sheet = workbook.Sheets[workbook.SheetNames[0]]
+  const data = XLSX.utils.sheet_to_json(sheet, {
+    raw: true,
+    defval: '',
+    blankrows: false,
+  })
+
+  // Converti Date → stringa ISO; lascia numeri e stringhe invariati
+  return data.map(row =>
+    Object.fromEntries(
+      Object.entries(row).map(([k, v]) => [
+        k,
+        v instanceof Date ? v.toISOString().split('T')[0] : v,
+      ])
+    )
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Invio a chunk verso /api/upload/json/{tipo}
+// ---------------------------------------------------------------------------
+async function inviaChunk(tipo, righe, apiHeaders, onProgress) {
+  const chunks = []
+  for (let i = 0; i < righe.length; i += CHUNK_SIZE) {
+    chunks.push(righe.slice(i, i + CHUNK_SIZE))
+  }
+
+  let lastData = null
+  for (let i = 0; i < chunks.length; i++) {
+    const isLast = i === chunks.length - 1
+    onProgress(`Invio dati… (${i + 1}/${chunks.length})`)
+
+    const res = await fetch(`/api/upload/json/${tipo}`, {
+      method: 'POST',
+      headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ righe: chunks[i], is_last_chunk: isLast }),
+    })
+    const text = await res.text()
+    let data
+    try { data = JSON.parse(text) } catch (_) { data = { detail: text } }
+
+    if (!res.ok) {
+      throw new Error(data.detail || `Errore HTTP ${res.status}`)
+    }
+    if (isLast) lastData = data
+  }
+
+  return lastData
+}
+
+// ---------------------------------------------------------------------------
+// Componente
+// ---------------------------------------------------------------------------
 export default function FileUploader({ tipo, label, obbligatorio = false, infoTitle, infoContent }) {
   const { apiHeaders, markFileCaricato, filesCaricati } = useStore()
   const [stato, setStato] = useState(null)   // null | "ok" | "errore" | "loading"
@@ -128,68 +186,28 @@ export default function FileUploader({ tipo, label, obbligatorio = false, infoTi
     if (!file) return
 
     setStato('loading')
-    setMsg(isCeduto ? 'Lettura file…' : 'Caricamento…')
+    setMsg('Lettura file…')
 
     try {
+      let righe
+
       if (isCeduto) {
-        // ── Elaborazione client-side (bypass limite 4.5 MB Vercel) ──────────
         const periodo = CEDUTO_PERIODI[tipo]
         setMsg('Elaborazione righe…')
-        const righe = await elaboraCedutoClientSide(file, periodo)
-
-        // Invia a chunk da 2000 righe per rispettare il limite 4.5 MB Vercel
-        const CHUNK_SIZE = 2000
-        const chunks = []
-        for (let i = 0; i < righe.length; i += CHUNK_SIZE) {
-          chunks.push(righe.slice(i, i + CHUNK_SIZE))
-        }
-
-        let lastData = null
-        for (let i = 0; i < chunks.length; i++) {
-          const isLast = i === chunks.length - 1
-          setMsg(`Invio dati… (${i + 1}/${chunks.length})`)
-          const res = await fetch(`/api/upload/json/${tipo}`, {
-            method: 'POST',
-            headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ righe: chunks[i], is_last_chunk: isLast }),
-          })
-          const text = await res.text()
-          let data
-          try { data = JSON.parse(text) } catch (_) { data = { detail: text } }
-          if (!res.ok) {
-            setStato('errore')
-            setMsg(data.detail || 'Errore sconosciuto')
-            return
-          }
-          if (isLast) lastData = data
-        }
-
-        setStato('ok')
-        setMsg(`${lastData?.righe ?? righe.length} righe elaborate`)
-        markFileCaricato(tipo)
+        righe = await elaboraCedutoClientSide(file, periodo)
       } else {
-        // ── Upload multipart standard (file piccoli) ──────────────────────────
-        const formData = new FormData()
-        formData.append('file', file)
-
-        const res = await fetch(`/api/upload/${tipo}`, {
-          method: 'POST',
-          headers: apiHeaders(),
-          body: formData,
-        })
-        const text = await res.text()
-        let data
-        try { data = JSON.parse(text) } catch (_) { data = { detail: text } }
-
-        if (!res.ok) {
-          setStato('errore')
-          setMsg(data.detail || 'Errore sconosciuto')
-        } else {
-          setStato('ok')
-          setMsg(`${data.righe} righe caricate`)
-          markFileCaricato(tipo)
+        righe = await leggiExcelGenerico(file)
+        if (righe.length === 0) {
+          throw new Error('Nessuna riga trovata nel file.')
         }
       }
+
+      const lastData = await inviaChunk(tipo, righe, apiHeaders, setMsg)
+
+      setStato('ok')
+      setMsg(`${lastData?.righe ?? righe.length} righe caricate`)
+      markFileCaricato(tipo)
+
     } catch (err) {
       setStato('errore')
       setMsg(err.message || 'Errore imprevisto')
