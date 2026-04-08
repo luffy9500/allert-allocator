@@ -10,7 +10,7 @@ from __future__ import annotations
 import io
 
 import pandas as pd
-from fastapi import APIRouter, Header, HTTPException, UploadFile, File
+from fastapi import APIRouter, Header, HTTPException, Request, UploadFile, File
 
 from . import session_store
 from .engine import (
@@ -108,4 +108,47 @@ async def upload_file(
         righe=len(df_clean),
         colonne=list(df_clean.columns),
         messaggio=f"File '{file.filename}' caricato: {len(df_clean)} righe.",
+    )
+
+
+@router.post("/json/{tipo_file}", response_model=UploadResponse)
+async def upload_json_data(
+    tipo_file: str,
+    request: Request,
+    x_session_id: str = Header(..., alias="X-Session-ID"),
+) -> UploadResponse:
+    """
+    Carica dati ceduto pre-elaborati client-side come JSON.
+    Body: { "righe": [{"COD_PDV": "...", "COD_ARTICOLO": "...", ...}, ...] }
+
+    Usato dal frontend per file grandi che superano il limite di upload Vercel (4.5 MB).
+    """
+    if tipo_file not in _TIPO_CONFIG:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo file non valido: '{tipo_file}'.",
+        )
+
+    body = await request.json()
+    righe = body.get("righe", [])
+
+    if not righe:
+        raise HTTPException(status_code=422, detail="Payload vuoto: nessuna riga ricevuta.")
+
+    df = pd.DataFrame(righe)
+    prepara_fn, attr_name = _TIPO_CONFIG[tipo_file]
+
+    try:
+        df_clean = prepara_fn(df)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    session = session_store.get_or_create(x_session_id)
+    setattr(session, attr_name, df_clean)
+
+    return UploadResponse(
+        tipo=tipo_file,
+        righe=len(df_clean),
+        colonne=list(df_clean.columns),
+        messaggio=f"Elaborato nel browser: {len(df_clean)} righe.",
     )
