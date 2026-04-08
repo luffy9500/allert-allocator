@@ -170,15 +170,19 @@ def _make_raw_ceduto_bytes(data_rows: list[list], n_cols: int = 20) -> bytes:
 
 
 def _raw_row(radice=30264, variante=1, tipo="L", pezzi=70, imballo=7, cod_pdv=20873, nome="SUPER MKT"):
-    """Crea una riga raw con i valori nelle colonne corrette."""
+    """Crea una riga raw con i valori negli indici 0-based corretti.
+    Le colonne del documento sono 1-based, qui si usa 0-based (col N → idx N-1):
+      col9→idx8=radice, col10→idx9=variante, col12→idx11=tipo,
+      col14→idx13=pezzi, col15→idx14=imballo, col17→idx16=cod_pdv, col18→idx17=nome
+    """
     row = [""] * 20
-    row[9]  = radice
-    row[10] = variante
-    row[12] = tipo
-    row[14] = pezzi
-    row[15] = imballo
-    row[17] = cod_pdv
-    row[18] = nome
+    row[8]  = radice
+    row[9]  = variante
+    row[11] = tipo
+    row[13] = pezzi
+    row[14] = imballo
+    row[16] = cod_pdv
+    row[17] = nome
     return row
 
 

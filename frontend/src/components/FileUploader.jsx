@@ -55,37 +55,44 @@ async function elaboraCedutoClientSide(file, periodo) {
       const row = data[i]
       if (!row || row.length <= 18) continue
 
-      // Col 9 (Radice) deve essere numerica — filtra header ripetuti e righe vuote
-      const radiceRaw = row[9]
+        // Indici 0-based (colonne 1-based del documento → -1):
+      // col9(1b)→idx8=Radice, col10(1b)→idx9=Variante, col12(1b)→idx11=TipoMov
+      // col14(1b)→idx13=Pezzi, col15(1b)→idx14=Imballo
+      // col17(1b)→idx16=CodPDV, col18(1b)→idx17=NomePDV
+
+      // Col 9 (1-based) = idx 8 = Radice — deve essere numerica
+      const radiceRaw = row[8]
       if (radiceRaw === '' || radiceRaw === null || radiceRaw === undefined) continue
       if (isNaN(Number(radiceRaw))) continue
 
-      // Col 12 (TipoMov) deve essere "L"
-      const tipoMov = String(row[12] ?? '').trim().toUpperCase()
+      // Col 12 (1-based) = idx 11 = TipoMov — deve essere "L"
+      const tipoMov = String(row[11] ?? '').trim().toUpperCase()
       if (tipoMov !== 'L') continue
 
-      // Quantità
-      const pezzi   = Math.round(Number(row[14]) || 0)
-      const imballo = Number(row[15]) || 0
+      // Col 14 (1-based) = idx 13 = Pezzi
+      // Col 15 (1-based) = idx 14 = Imballo
+      const pezzi   = Math.round(Number(row[13]) || 0)
+      const imballo = Number(row[14]) || 0
       const imballoEff = imballo <= 0 ? 1 : imballo
       const colli   = Math.round(pezzi / imballoEff)
 
       // Scarta valori negativi
       if (pezzi < 0 || colli < 0) continue
 
-      // COD_ARTICOLO = radice + variante.padStart(2, '0')
-      const radiceStr  = String(Math.round(Number(radiceRaw)))
-      const variante   = Number(row[10]) || 0
+      // COD_ARTICOLO: idx 8 (Radice) + idx 9 (Variante) zero-padded a 2 cifre
+      const radiceStr   = String(Math.round(Number(radiceRaw)))
+      const variante    = Number(row[9]) || 0
       const varianteStr = String(Math.round(variante)).padStart(2, '0')
       const codArticolo = radiceStr + varianteStr
 
-      // COD_PDV: 6 cifre che terminano con "0" → rimuovi l'ultimo zero
-      let codPdv = String(Math.round(Number(row[17]) || 0))
+      // COD_PDV: idx 16 — 6 cifre con "0" finale → rimuovi l'ultimo zero
+      let codPdv = String(Math.round(Number(row[16]) || 0))
       if (codPdv.length === 6 && codPdv.endsWith('0')) {
         codPdv = codPdv.slice(0, -1)
       }
 
-      const nomePdv = String(row[18] ?? '').trim()
+      // NomePDV: idx 17
+      const nomePdv = String(row[17] ?? '').trim()
 
       righe.push({
         COD_PDV:      codPdv,

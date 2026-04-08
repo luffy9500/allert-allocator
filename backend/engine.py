@@ -102,10 +102,10 @@ def trasforma_ceduto_raw(content: bytes, periodo: str) -> pd.DataFrame:
 
     df = pd.concat(frames, ignore_index=True)
 
-    if df.shape[1] <= 18:
+    if df.shape[1] <= 17:
         raise ValueError(
             f"Il file ha solo {df.shape[1]} colonne; "
-            "il formato grezzo ne richiede almeno 19 (indici 0–18)."
+            "il formato grezzo ne richiede almeno 18 (indici 0–17)."
         )
 
     # ── Helper interni ────────────────────────────────────────────────────────
@@ -128,29 +128,33 @@ def trasforma_ceduto_raw(content: bytes, periodo: str) -> pd.DataFrame:
             return False
 
     # ── Step 2: Filtro righe valide ───────────────────────────────────────────
-    # Scarta righe con col 9 non numerica (header ripetuti, totali, righe vuote)
-    mask_radice = df.iloc[:, 9].apply(_is_numeric)
+    # Colonne 1-based → indice 0-based: col9→8, col10→9, col12→11, col14→13,
+    #                                   col15→14, col17→16, col18→17
+    # Col 9 (1-based) = indice 8 = AM1CART = Radice
+    mask_radice = df.iloc[:, 8].apply(_is_numeric)
     df = df[mask_radice].copy()
 
     if df.empty:
         raise ValueError(
-            "Nessuna riga valida: colonna 9 (Radice) sempre vuota o non numerica. "
+            "Nessuna riga valida: colonna 9 (Radice, indice 8) sempre vuota o non numerica. "
             "Verificare che il file sia nel formato grezzo corretto."
         )
 
-    # Tieni solo le righe con tipo movimento = "L" (colonna 12)
-    col12 = df.iloc[:, 12].astype(str).str.strip().str.upper()
-    df = df[col12 == "L"].copy()
+    # Col 12 (1-based) = indice 11 = AM1CLST = TipoMov — tieni solo "L"
+    col11 = df.iloc[:, 11].astype(str).str.strip().str.upper()
+    df = df[col11 == "L"].copy()
 
     if df.empty:
         raise ValueError(
-            "Nessuna riga con tipo movimento = 'L' (colonna 12). "
+            "Nessuna riga con tipo movimento = 'L' (colonna 12, indice 11). "
             "Verificare il formato del file."
         )
 
     # ── Step 3: Trasformazioni ────────────────────────────────────────────────
-    pezzi   = pd.to_numeric(df.iloc[:, 14], errors="coerce").fillna(0)
-    imballo = pd.to_numeric(df.iloc[:, 15], errors="coerce").fillna(0)
+    # Col 14 (1-based) = indice 13 = AM1QESK01 = Pezzi
+    # Col 15 (1-based) = indice 14 = ANQICV = Imballo
+    pezzi   = pd.to_numeric(df.iloc[:, 13], errors="coerce").fillna(0)
+    imballo = pd.to_numeric(df.iloc[:, 14], errors="coerce").fillna(0)
     imballo = imballo.replace(0, 1)  # imballo=0 o vuoto → usa 1
 
     colli = (pezzi / imballo).round().astype(int)
@@ -158,20 +162,22 @@ def trasforma_ceduto_raw(content: bytes, periodo: str) -> pd.DataFrame:
     # Scarta valori negativi
     mask_pos = (pezzi >= 0) & (colli >= 0)
 
-    # COD_ARTICOLO = radice + variante (zero-pad a 2 cifre)
-    radice   = df.iloc[:, 9].apply(_to_int_str)
-    variante = df.iloc[:, 10].apply(lambda v: _to_int_str(v).zfill(2) if _to_int_str(v) else "00")
+    # COD_ARTICOLO: Col 9 (idx 8) = Radice + Col 10 (idx 9) = Variante zero-pad 2 cifre
+    radice   = df.iloc[:, 8].apply(_to_int_str)
+    variante = df.iloc[:, 9].apply(lambda v: _to_int_str(v).zfill(2) if _to_int_str(v) else "00")
     cod_articolo = radice + variante
 
-    # COD_PDV: 6 cifre che terminano con "0" → rimuovi lo zero finale
+    # COD_PDV: Col 17 (idx 16) = AM1CDST — 6 cifre con "0" finale → rimuovi lo zero
     def _normalizza_pdv(val: object) -> str:
         s = _to_int_str(val)
         if len(s) == 6 and s.endswith("0"):
             return s[:-1]
         return s
 
-    cod_pdv  = df.iloc[:, 17].apply(_normalizza_pdv)
-    nome_pdv = df.iloc[:, 18].astype(str).str.strip()
+    # Col 17 (1-based) = indice 16 = AM1CDST = CodPDV
+    # Col 18 (1-based) = indice 17 = NDXDST  = NomePDV
+    cod_pdv  = df.iloc[:, 16].apply(_normalizza_pdv)
+    nome_pdv = df.iloc[:, 17].astype(str).str.strip()
 
     # ── Step 4: Costruzione output ────────────────────────────────────────────
     col_colli = f"QTA_CEDUTA_{periodo}_COLLI"
