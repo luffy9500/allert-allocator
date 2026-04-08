@@ -143,8 +143,9 @@ export default function FileUploader({ tipo, label, obbligatorio = false, infoTi
           headers: { ...apiHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ righe }),
         })
+        const text = await res.text()
         let data
-        try { data = await res.json() } catch (_) { data = { detail: await res.text() } }
+        try { data = JSON.parse(text) } catch (_) { data = { detail: text } }
 
         if (!res.ok) {
           setStato('errore')
@@ -164,8 +165,9 @@ export default function FileUploader({ tipo, label, obbligatorio = false, infoTi
           headers: apiHeaders(),
           body: formData,
         })
+        const text = await res.text()
         let data
-        try { data = await res.json() } catch (_) { data = { detail: await res.text() } }
+        try { data = JSON.parse(text) } catch (_) { data = { detail: text } }
 
         if (!res.ok) {
           setStato('errore')
