@@ -10,6 +10,7 @@ In produzione (Vercel):
     dalla directory frontend/dist costruita durante il deploy.
 """
 
+import sys
 import traceback
 
 from pathlib import Path
@@ -23,8 +24,20 @@ from .router_upload import router as upload_router
 from .router_elabora import router as elabora_router
 from .router_export import router as export_router
 
+
+def _get_base_dir() -> Path:
+    """
+    Restituisce la directory base sia in sviluppo sia nel bundle PyInstaller.
+    - Sviluppo:  root del repo (parent di backend/)
+    - Bundle:    sys._MEIPASS (dove PyInstaller estrae tutti i datas)
+    """
+    if getattr(sys, 'frozen', False):
+        return Path(sys._MEIPASS)
+    return Path(__file__).parent.parent
+
+
 # Percorso assoluto della build React (prodotto da: cd frontend && npm run build)
-_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+_DIST = _get_base_dir() / "frontend" / "dist"
 
 app = FastAPI(
     title="Allert Allocator",
